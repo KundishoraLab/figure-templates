@@ -58,6 +58,43 @@ PANELS = [
      'upset(sets, "panels/upset", min_subset_size=1)'),
 ]
 
+# R-only panels (demo/gallery_clinical.R). These have no Python twin — the
+# forest is a hand-rolled ggplot layout engine and KM leans on survminer.
+R_PANELS = [
+    ("14_forest_general", "Forest — predictors",
+     "JAMA table-forest: text table | forest | estimate column. Arrowheads "
+     "mark CIs clipped by the axis; box area ∝ N.",
+     'fk_forest_general(df,\n'
+     '  cols = list(list(col = "n_label", header = "N"),\n'
+     '              list(col = "p_label", header = "FDR P")),\n'
+     '  x_lab = "Odds ratio (95% CI)", est_col_header = "OR (95% CI)")'),
+    ("15_forest_meta", "Forest — meta-analysis",
+     "Per-study rows + pooled diamond. `label_header` retitles the implicit "
+     "first column; directional labels sit under the axis.",
+     'fk_forest_meta(df,\n'
+     '  cols = list(list(col = "n_label", header = "N")),\n'
+     '  label_header = "Study",\n'
+     '  left_label = "← Negative", right_label = "Variant+ →")'),
+    ("16_km_curve", "Kaplan-Meier",
+     "Survival curves + risk table. CI ribbons at alpha 0.2, censor ticks "
+     "dimmed to 0.4 — they annotate, they aren't the estimate.",
+     'km <- fk_km_panel(df, "age", "event", "group",\n'
+     '                  xlab = "Age (years)", xlim_max = 60)\n'
+     'fk_save_km_panel("panels/", "fig1d_km", km, w = 5.5, h = 5)'),
+    ("17_regression_scatter", "Regression scatter",
+     "Points + fitted line with CI ribbon, by group. Faint points so density "
+     "reads; `fixed_axis` pins one scale across panels.",
+     'fk_regression_scatter(df, x_var = "age", y_var = "vaf",\n'
+     '  color_var = "genotype", fixed_axis = "y",\n'
+     '  fixed_limits = c(0, 8), fixed_breaks = c(0, 2, 4, 6, 8))'),
+    ("18_dumbbell", "Dumbbell prevalence",
+     "Paired prevalence per feature, dot size ∝ N, optional 95% CI bars. "
+     "No connecting line — the dodge does the pairing.",
+     'fk_dumbbell(df, feature_col = "feature", group_col = "group",\n'
+     '            value_col = "prevalence", n_col = "n",\n'
+     '            lo_col = "lo", hi_col = "hi")'),
+]
+
 CSS = """
 :root { --bg:#ffffff; --fg:#16181d; --muted:#5c6370; --card:#f7f8fa;
         --border:#e3e6ea; --code:#f0f2f5; --accent:#c51b8a; }
@@ -79,6 +116,9 @@ h1 { font-size:1.9rem; margin:0 0 .3rem; letter-spacing:-.02em; }
 .card h2 { font-size:1.15rem; margin:0 0 .2rem; }
 .card h2 .n { color:var(--accent); font-variant-numeric:tabular-nums; margin-right:.5rem; }
 .card p { margin:0 0 .9rem; color:var(--muted); font-size:.92rem; }
+.sect { font-size:1.05rem; margin:2.2rem 0 1rem; padding-bottom:.4rem;
+        border-bottom:1px solid var(--border); letter-spacing:.02em;
+        text-transform:uppercase; color:var(--muted); font-weight:600; }
 .imgwrap { overflow-x:auto; background:#fff; border:1px solid var(--border);
            border-radius:6px; padding:.5rem; }
 img { display:block; max-width:100%; height:auto; margin:0 auto; }
@@ -110,29 +150,46 @@ def main() -> int:
         '<p class="sub">Every panel below is rendered from synthetic data by '
         '<code>demo/gallery.py</code> — no private inputs. Find the one that '
         "looks like what you need and copy its call.</p>",
-        f'<p><span class="meta">theme: avm</span>'
-        f'<span class="meta">{len(PANELS)} panel types</span>'
-        f'<span class="meta">python + R</span></p>',
+        f"<p><span class=\"meta\">theme: avm</span>"
+        f"<span class=\"meta\">{len(PANELS) + len(R_PANELS)} panel types</span>"
+        f"<span class=\"meta\">python + R</span></p>",
     ]
 
-    n_found = 0
-    for i, (stem, title, desc, code) in enumerate(PANELS, 1):
-        png = gal / f"{stem}.png"
-        parts.append('<div class="card">')
-        parts.append(f'<h2><span class="n">{i:02d}</span>{title}</h2>')
-        parts.append(f"<p>{desc}</p>")
-        if png.exists():
-            parts.append(f'<div class="imgwrap"><img alt="{title}" src="{embed(png)}"></div>')
-            n_found += 1
-        else:
-            parts.append('<div class="missing">not rendered — optional '
-                         "dependency missing (see README)</div>")
-        parts.append(f"<pre>{code}</pre>")
-        parts.append("</div>")
+    n_found = n_total = 0
+
+    def emit(panels, src_dir, start):
+        nonlocal n_found, n_total
+        for i, (stem, title, desc, code) in enumerate(panels, start):
+            n_total += 1
+            png = src_dir / f"{stem}.png"
+            parts.append('<div class="card">')
+            parts.append(f'<h2><span class="n">{i:02d}</span>{title}</h2>')
+            parts.append(f"<p>{desc}</p>")
+            if png.exists():
+                parts.append(f'<div class="imgwrap"><img alt="{title}" '
+                             f'src="{embed(png)}"></div>')
+                n_found += 1
+            else:
+                parts.append('<div class="missing">not rendered — optional '
+                             "dependency missing (see README)</div>")
+            parts.append(f"<pre>{code}</pre>")
+            parts.append("</div>")
+
+    parts.append('<h2 class="sect">Python — matplotlib</h2>')
+    emit(PANELS, gal, 1)
+
+    gal_r = ROOT / "gallery_R"
+    parts.append('<h2 class="sect">R — ggplot2 (no Python twin)</h2>')
+    parts.append('<p class="sub">Clinical panels ported from the '
+                 "genotype-phenotype manuscript pipeline. Render with "
+                 "<code>Rscript demo/gallery_clinical.R --theme avm</code>.</p>")
+    emit(R_PANELS, gal_r, len(PANELS) + 1)
 
     parts.append(
-        f"<footer>{n_found}/{len(PANELS)} panels embedded. "
+        f"<footer>{n_found}/{n_total} panels embedded. "
         "Rebuild: <code>python demo/gallery.py --theme avm && "
+        "Rscript demo/gallery.R --theme avm && "
+        "Rscript demo/gallery_clinical.R --theme avm && "
         "python demo/build_gallery_html.py</code></footer></div>")
 
     html = (f"<!doctype html><html><head><meta charset='utf-8'>"
@@ -143,7 +200,7 @@ def main() -> int:
     out = gal / "index.html"
     out.write_text(html)
     size_mb = out.stat().st_size / 1e6
-    print(f"[ok] {out}  ({n_found}/{len(PANELS)} panels, {size_mb:.1f} MB)")
+    print(f"[ok] {out}  ({n_found}/{n_total} panels, {size_mb:.1f} MB)")
     return 0
 
 

@@ -13,12 +13,13 @@ and generalised. **No data ships with it** — the gallery runs entirely on
 synthetic inputs.
 
 ```bash
-python demo/gallery.py --theme avm       # render every panel type -> gallery/
-python demo/build_gallery_html.py        # bundle them into gallery/index.html
-Rscript demo/gallery.R --theme avm       # the R track -> gallery_R/
+python demo/gallery.py --theme avm        # render every panel type -> gallery/
+Rscript demo/gallery.R --theme avm        # the R track -> gallery_R/
+Rscript demo/gallery_clinical.R --theme avm   # forest / KM / regression / dumbbell
+python demo/build_gallery_html.py         # bundle them into gallery/index.html
 ```
 
-Open `gallery/index.html` to see all 13 panels with the call that made each.
+Open `gallery/index.html` to see all 18 panels with the call that made each.
 
 The gallery renders at 200dpi/PNG because it's a *reference*. For real panels
 use the library defaults (600dpi, PNG+SVG) — or
@@ -92,6 +93,26 @@ R mirrors these as `fk_*` (`fk_volcano`, `fk_dotplot_pathway`, `fk_umap_categori
 `fk_lollipop`, `fk_stacked_bar`, `fk_ordered_bar`, `fk_heatmap`, `fk_save_panel`)
 plus `fk_theme_pub` / `fk_theme_umap` / `fk_umap_arrows`.
 
+**R-only** — clinical panels with no Python twin (the forest is a hand-rolled
+ggplot layout engine; KM leans on survminer):
+
+| Module | Functions |
+|---|---|
+| `R/forest.R` | `fk_table_forest`, `fk_forest_meta`, `fk_forest_general`, `fk_forest_compact_*` |
+| `R/clinical.R` | `fk_km_panel`, `fk_save_km_panel`, `fk_regression_scatter`, `fk_dumbbell` |
+
+```r
+source("R/figkit.R"); source("R/forest.R"); source("R/clinical.R")
+
+# JAMA table-forest. NOTE: data$label renders automatically as the left-most
+# column — `cols` lists only the columns AFTER it.
+fk_forest_general(df, cols = list(list(col = "n_label", header = "N")),
+                  x_lab = "Odds ratio (95% CI)", label_header = "Predictor")
+
+km <- fk_km_panel(df, "age", "event", "group", xlab = "Age (years)")
+fk_save_km_panel("panels/", "fig1d_km", km, w = 5.5, h = 5)
+```
+
 Every Python plot takes an `ax` and returns a summary dict, so panels compose
 into a figure with plain `plt.subplots` / `GridSpec`. (`network.py` is the
 exception — pycirclize and upsetplot build their own figures.)
@@ -118,6 +139,9 @@ fixes a failure mode that produced a wrong-looking figure at least once:
   tell "rare" from "we only measured a few".
 - **`ordered_bar` won't re-sort by value**, so an anatomical or dose axis keeps
   its meaning; categories outside `order` are dropped *loudly*.
+- **No significance stars on bars.** Stars, `n=`, and stat text drawn on bars
+  belong in the table or caption: the bar carries the estimate, the text
+  carries the inference. `ordered_bar` has no option for them.
 - **`lollipop` selects by |value|, displays by signed value** — ranking by raw
   value silently returns only the up side.
 - **Equal aspect on embeddings.** A stretched UMAP rescales the distances the
@@ -183,3 +207,21 @@ decoupled from that project's paths, HPC mounts and cohort vocabulary. The
 expression dotplot was promoted out of a single figure renderer into a real
 function. Original behaviour is preserved; original names survive as aliases
 (`dotplot_gsea`, `heatmap_complex`, `lollipop_tf`, `stacked_hbar`).
+
+The forest and clinical panels come from `genotype-phenotype`
+(`analysis/helper_scripts/utils.R` + the `04b/04c` KM producers). `table_forest`
+existed in two forked copies; the genotype-phenotype one is canonical (the
+`avm-spatial-tx` copy predates the 2026-05-28 one-row-mode fixes) and is what
+was ported. It is byte-faithful except:
+
+- `point_col` defaults to `theme$down` instead of a hardcoded `#2166AC`.
+- `label_header` is new — the implicit first column's header was hardcoded to
+  `"Predictor"`, which is wrong for a meta-analysis forest ("Study").
+- `size_col` now strips thousands separators before coercing. A display N of
+  `"1,204"` used to become `NA` and silently drop that row's dot size.
+- **Bug fix:** passing `left_label`/`right_label` used to clip the x-axis title
+  off the panel. The floor was `dir_label_y - 0.25` (= `axis_y - 1.10`) while
+  the title sits at `axis_y - 1.30`; the 2026-05-28 polish that dropped the
+  title and raised the other branch's pad to 1.70 never updated this branch.
+  The floor is now the min of both. ggplot reported it only as a generic
+  "Removed 1 row containing missing values".
