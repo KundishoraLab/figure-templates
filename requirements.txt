@@ -1,0 +1,10 @@
+# Core — every plot except chord/upset needs only these.
+matplotlib>=3.5
+pandas>=1.3
+numpy>=1.21
+adjustText>=0.8      # volcano label placement; degrades with a warning if absent
+
+# Optional — the plots that need them raise a clear install hint instead.
+# pycirclize>=1.0    # chord, chord_signed
+# upsetplot>=0.8     # upset
+# anndata>=0.8       # expression_matrix() only

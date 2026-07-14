@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.Rhistory
+.RData
+.DS_Store
+.ipynb_checkpoints/
+*.egg-info/
+
+# Gallery PNG/SVG/PDF are committed on purpose — they are the reference for
+# what each plot looks like, and the receiving agent should see them without
+# running anything. Only stray output dirs are ignored.
+/panels/
+/out/
