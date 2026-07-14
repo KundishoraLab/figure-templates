@@ -412,8 +412,11 @@ fk_stacked_bar <- function(df, group_col = "group", cat_col = "category",
 # ── Ordered bar ─────────────────────────────────────────────────────────────
 # `order` exists so a categorical axis with real structure (anatomical,
 # developmental, a dose ladder) keeps it instead of being re-sorted by value.
+#
+# Deliberately has no significance-annotation option: stars, n=, and stat text
+# drawn on bars belong in the table or caption instead.
 fk_ordered_bar <- function(df, value_col, label_col = "cell_type",
-                           order = NULL, palette = NULL, sig_col = NULL,
+                           order = NULL, palette = NULL,
                            x_label = "", base_size = 12,
                            theme = fk_get_theme()) {
   d <- as.data.frame(df)
@@ -439,10 +442,6 @@ fk_ordered_bar <- function(df, value_col, label_col = "cell_type",
     scale_x_continuous(expand = expansion(mult = c(0, 0.08))) +
     labs(x = x_label, y = NULL) +
     fk_theme_pub(base_size = base_size, grid = FALSE)
-  if (!is.null(sig_col) && sig_col %in% names(d)) {
-    p <- p + geom_text(aes(label = .data[[sig_col]]), hjust = -0.25,
-                       size = base_size / 3.8, colour = "#404040")
-  }
   p
 }
 

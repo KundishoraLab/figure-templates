@@ -51,7 +51,7 @@ PANELS = [
      'stacked_bar(comp, ax, palette=pal, legend_title="Cell type")'),
     ("11_ordered_bar", "Ordered bar", "One statistic per category, in a fixed order.",
      'ordered_bar(df, ax, value_col="pct_variant", order=AV_ORDER,\n'
-     '            palette=theme.palette("ec_subtype"), sig_col="sig")'),
+     '            palette=theme.palette("ec_subtype"))'),
     ("12_chord_signed", "Chord (signed)", "Interaction Δ; needs pycirclize.",
      'chord_signed(m, "panels/chord", top_n_per_sign=14)'),
     ("13_upset", "UpSet", "Set intersections across modalities.",

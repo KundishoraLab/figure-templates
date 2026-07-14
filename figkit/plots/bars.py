@@ -87,8 +87,7 @@ stacked_hbar = stacked_bar
 
 
 def ordered_bar(df, ax, value_col: str, label_col: str = None, order=None,
-                palette=None, sig_col: str | None = None,
-                x_label: str = "", theme: Theme | None = None,
+                palette=None, x_label: str = "", theme: Theme | None = None,
                 orient: str = "h", bar_width: float = 0.72):
     """Bar of one statistic per category, held in a caller-supplied `order`.
 
@@ -97,8 +96,9 @@ def ordered_bar(df, ax, value_col: str, label_col: str = None, order=None,
     of being re-sorted by value. Categories not in `order` are dropped, and
     it says how many.
 
-    sig_col : column of pre-rendered annotations (e.g. "*", "n.s.") drawn at
-        the bar tip.
+    Deliberately has no significance-annotation option: stars, n=, and stat
+    text drawn on bars belong in the table or caption instead. The bar encodes
+    the estimate; the reader gets the inference from the text.
     """
     t = resolve(theme)
     d = pd.DataFrame(df).copy()
@@ -137,16 +137,5 @@ def ordered_bar(df, ax, value_col: str, label_col: str = None, order=None,
                            fontsize=9)
         ax.set_ylabel(x_label)
 
-    if sig_col and sig_col in d.columns:
-        span = (np.nanmax(vals) - min(0, np.nanmin(vals))) or 1.0
-        for p, v, s in zip(pos, vals, d[sig_col].astype(str)):
-            if not s or s.lower() in ("nan", "none"):
-                continue
-            if orient == "h":
-                ax.text(v + 0.02 * span, p, s, va="center", ha="left",
-                        fontsize=8, color="#404040")
-            else:
-                ax.text(p, v + 0.02 * span, s, ha="center", va="bottom",
-                        fontsize=8, color="#404040")
     despine(ax)
     return {"n_bars": len(d)}

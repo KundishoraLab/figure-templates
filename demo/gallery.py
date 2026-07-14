@@ -228,14 +228,13 @@ def _obar(out, theme):
         "cell_type": order,
         "pct_variant": np.clip(rng.uniform(0, 3, len(order)) +
                                np.linspace(0, 4, len(order)), 0, None),
-        "sig": ["", "", "", "*", "*", "**", "***", "**"],
     })
     palette = None
     if theme is not None and "ec_subtype" in theme.palettes:
         palette = theme.palette("ec_subtype")
     fig, ax = plt.subplots(figsize=(6, 3.6))
     stats = ordered_bar(df, ax, value_col="pct_variant", label_col="cell_type",
-                        order=order, palette=palette, sig_col="sig",
+                        order=order, palette=palette,
                         x_label="Variant+ cells (% of subtype)", theme=theme)
     ax.set_title("Variant burden along the arteriovenous axis", fontsize=12)
     save(fig, "11_ordered_bar", out)

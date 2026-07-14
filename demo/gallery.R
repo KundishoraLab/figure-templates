@@ -138,12 +138,11 @@ render("11_ordered_bar", {
   bar <- data.frame(cell_type = ec,
                     pct_variant = pmax(runif(length(ec), 0, 3) +
                                        seq(0, 4, length.out = length(ec)), 0),
-                    sig = c("", "", "", "*", "*", "**", "***", "**"),
                     stringsAsFactors = FALSE)
   fk_ordered_bar(bar, value_col = "pct_variant", label_col = "cell_type",
                  order = ec,
                  palette = if (theme_name == "avm") FK_EC_SUBTYPE_COLORS else NULL,
-                 sig_col = "sig", x_label = "Variant+ cells (% of subtype)") +
+                 x_label = "Variant+ cells (% of subtype)") +
     ggtitle("Variant burden along the arteriovenous axis")
 }, 6.5, 3.8)
 
