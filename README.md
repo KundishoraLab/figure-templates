@@ -1,16 +1,18 @@
-# figure-design-kit
+# figure-templates
 
-A modular publication-figure toolkit for single-cell / spatial omics, in
-**Python (matplotlib)** and **R (ggplot2)**.
+A modular publication-figure toolkit for single-cell, spatial and clinical
+omics, in **Python (matplotlib)** and **R (ggplot2)**.
 
 Volcano, UMAP/embedding, expression dotplot, pathway dotplot, heatmap,
-lollipop, composition bars, chord, UpSet — each a small function that takes an
-`ax` (or returns a `ggplot`), reads its colours from a swappable **theme**, and
-carries the design decisions that make the plot honest.
+lollipop, composition bars, chord, UpSet — plus a JAMA-style table-forest,
+Kaplan-Meier curves, regression scatter and dumbbell. Each is a small function
+that takes an `ax` (or returns a `ggplot`), reads its colours from a swappable
+**theme**, and carries the design decisions that make the plot honest.
 
-Extracted from a working brain-AVM spatial-transcriptomics manuscript pipeline
-and generalised. **No data ships with it** — the gallery runs entirely on
-synthetic inputs.
+Pulled out of the Kundishora Lab's brain-AVM manuscript pipelines and
+generalised, so the same visual language can be reused on an unrelated dataset.
+**No data ships with it** — every panel in the gallery runs on synthetic
+inputs, so you can clone it and see all 18 immediately.
 
 ```bash
 python demo/gallery.py --theme avm        # render every panel type -> gallery/
@@ -201,27 +203,32 @@ gallery/           rendered panels + index.html
 
 ## Provenance
 
-Extracted from `avm-spatial-tx` (`scripts/05_scrna_niche_analysis/_style.py`,
-`scripts/07_manuscript_figures/_helpers/_style_fig456.py` and `utils.R`), then
-decoupled from that project's paths, HPC mounts and cohort vocabulary. The
-expression dotplot was promoted out of a single figure renderer into a real
-function. Original behaviour is preserved; original names survive as aliases
-(`dotplot_gsea`, `heatmap_complex`, `lollipop_tf`, `stacked_hbar`).
+This is the figure layer of the Kundishora Lab's brain-AVM work — spatial
+transcriptomics and the genotype–phenotype cohort study — pulled out of those
+pipelines and generalised. The design decisions listed above are the accumulated
+result of taking those figures through review; each one is here because getting
+it wrong produced a misleading panel at least once.
 
-The forest and clinical panels come from `genotype-phenotype`
-(`analysis/helper_scripts/utils.R` + the `04b/04c` KM producers). `table_forest`
-existed in two forked copies; the genotype-phenotype one is canonical (the
-`avm-spatial-tx` copy predates the 2026-05-28 one-row-mode fixes) and is what
-was ported. It is byte-faithful except:
+Companion repo: [bAVM-genotype-phenotype](https://github.com/KundishoraLab/bAVM-genotype-phenotype).
 
-- `point_col` defaults to `theme$down` instead of a hardcoded `#2166AC`.
-- `label_header` is new — the implicit first column's header was hardcoded to
+Names from the original code survive as aliases, so existing scripts keep
+working: `dotplot_gsea`, `heatmap_complex`, `lollipop_tf`, `stacked_hbar`.
+
+The table-forest is ported faithfully from the manuscript pipeline, with four
+deliberate changes:
+
+- `point_col` follows the theme rather than a hardcoded blue.
+- `label_header` is new. The first column's header used to be hardcoded to
   `"Predictor"`, which is wrong for a meta-analysis forest ("Study").
-- `size_col` now strips thousands separators before coercing. A display N of
-  `"1,204"` used to become `NA` and silently drop that row's dot size.
-- **Bug fix:** passing `left_label`/`right_label` used to clip the x-axis title
-  off the panel. The floor was `dir_label_y - 0.25` (= `axis_y - 1.10`) while
-  the title sits at `axis_y - 1.30`; the 2026-05-28 polish that dropped the
-  title and raised the other branch's pad to 1.70 never updated this branch.
-  The floor is now the min of both. ggplot reported it only as a generic
-  "Removed 1 row containing missing values".
+- `size_col` strips thousands separators before coercing to numeric. A display
+  N of `"1,204"` previously became `NA` and silently dropped that row's dot
+  size — the row still plotted, just with no size mapping.
+- **Bug fix:** passing `left_label`/`right_label` clipped the x-axis title off
+  the panel. The lower y-limit was derived from the directional labels alone,
+  leaving it above the title; it is now the minimum of both. ggplot surfaced
+  this only as a generic "Removed 1 row containing missing values", which is
+  the kind of thing this repo exists to stop repeating.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

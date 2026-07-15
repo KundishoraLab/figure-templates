@@ -146,7 +146,7 @@ def main() -> int:
 
     parts = [
         '<div class="wrap">',
-        "<h1>figkit gallery</h1>",
+        "<h1>figure-templates gallery</h1>",
         '<p class="sub">Every panel below is rendered from synthetic data by '
         '<code>demo/gallery.py</code> — no private inputs. Find the one that '
         "looks like what you need and copy its call.</p>",
@@ -194,7 +194,7 @@ def main() -> int:
 
     html = (f"<!doctype html><html><head><meta charset='utf-8'>"
             f"<meta name='viewport' content='width=device-width, initial-scale=1'>"
-            f"<title>figkit gallery</title><style>{CSS}</style></head>"
+            f"<title>figure-templates gallery</title><style>{CSS}</style></head>"
             f"<body>{''.join(parts)}</body></html>")
 
     out = gal / "index.html"
