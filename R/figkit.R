@@ -350,7 +350,7 @@ fk_dotplot_pathway <- function(df, pathway_col = "pathway", nes_col = "NES",
 fk_gsea_kundishora <- function(fgsea_res, n_up = 10, n_down = 10,
                                pathway_col = "pathway", nes_col = "NES",
                                padj_col = "padj", strip = "^(HALLMARK|GOBP|REACTOME|KEGG)_",
-                               base_size = 12, x_label = "NES",
+                               base_size = 12, x_label = "NES", sig_line = 0.05,
                                theme = fk_get_theme()) {
   d <- as.data.frame(fgsea_res)
   if (!padj_col %in% names(d) && "pval" %in% names(d)) padj_col <- "pval"
@@ -358,15 +358,30 @@ fk_gsea_kundishora <- function(fgsea_res, n_up = 10, n_down = 10,
   d[[padj_col]] <- pmax(suppressWarnings(as.numeric(d[[padj_col]])), 1e-300)
   d <- d[is.finite(d[[nes_col]]) & is.finite(d[[padj_col]]), , drop = FALSE]
   if (!nrow(d)) stop("fk_gsea_kundishora: no finite rows")
-  d[[pathway_col]] <- gsub("_", " ", sub(strip, "", as.character(d[[pathway_col]])))
-  # explicit symmetric selection, so it does not depend on top_n parity
-  up   <- utils::head(d[order(-d[[nes_col]]), , drop = FALSE], n_up)
-  down <- utils::head(d[order(d[[nes_col]]),  , drop = FALSE], n_down)
+  d$.path <- gsub("_", " ", sub(strip, "", as.character(d[[pathway_col]])))
+  d$.nlp  <- -log10(d[[padj_col]])
+  d$.dir  <- ifelse(d[[nes_col]] >= 0, "up", "down")
+  # symmetric selection: top n_up positive-NES + top n_down negative-NES, by significance
+  up   <- utils::head(d[d[[nes_col]] > 0, , drop = FALSE][order(-d$.nlp[d[[nes_col]] > 0]), ], n_up)
+  down <- utils::head(d[d[[nes_col]] < 0, , drop = FALSE][order(-d$.nlp[d[[nes_col]] < 0]), ], n_down)
   sel  <- unique(rbind(up, down))
-  fk_dotplot_pathway(sel, pathway_col = pathway_col, nes_col = nes_col,
-                     padj_col = padj_col, top_n = nrow(sel), sort_by = "nes",
-                     base_size = base_size, x_label = x_label, prettify = FALSE,
-                     theme = theme)
+  sel  <- sel[order(sel[[nes_col]]), , drop = FALSE]
+  sel$.path <- factor(sel$.path, levels = sel$.path)
+  # The house GSEA dot plot: x = NES (sign = direction, so up and down are visibly split),
+  # DOT COLOUR = -log10(padj) — the magnitude of significance — on a low→high gradient, and dot
+  # SIZE also tracks it so faint hits recede. This is the encoding used across every pathway
+  # panel in the paper; do not recolour by NES (that hides which hits are actually significant).
+  ggplot2::ggplot(sel, ggplot2::aes(x = .data[[nes_col]], y = .data$.path)) +
+    ggplot2::geom_vline(xintercept = 0, linewidth = 0.4, colour = "grey55") +
+    ggplot2::geom_segment(ggplot2::aes(x = 0, xend = .data[[nes_col]],
+                                       y = .data$.path, yend = .data$.path),
+                          colour = "grey85", linewidth = 0.4) +
+    ggplot2::geom_point(ggplot2::aes(size = .data$.nlp, colour = .data$.nlp)) +
+    ggplot2::scale_colour_gradient(low = "grey80", high = theme$up,
+                                   name = expression(-log[10]~padj)) +
+    ggplot2::scale_size_continuous(range = c(2, 7), guide = "none") +
+    ggplot2::labs(x = x_label, y = NULL) +
+    fk_theme_pub(base_size = base_size, grid = FALSE)
 }
 
 # ── Lollipop ────────────────────────────────────────────────────────────────
