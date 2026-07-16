@@ -335,6 +335,40 @@ fk_dotplot_pathway <- function(df, pathway_col = "pathway", nes_col = "NES",
     fk_theme_pub(base_size = base_size, grid = FALSE)
 }
 
+# ── Standardised GSEA dot plot (house contract) ──────────────────────────────
+# One entry point for every pathway panel in a paper, so they cannot drift apart.
+# The contract, deliberately opinionated:
+#   * ALWAYS symmetric: top n_up by NES AND top n_down by NES. The commonest GSEA-
+#     panel bug is selecting top-by-padj, which — when a contrast is mostly up —
+#     returns an all-up panel and the reader asks "where are the downregulated
+#     pathways?". Selecting by NES from both ends makes that impossible.
+#   * HALLMARK label cleanup by default (strip HALLMARK_/GOBP_, underscores→spaces).
+#   * red up / blue down, size by -log10 padj, centred diverging fill.
+# Takes a raw fgsea data.frame (cols pathway, NES, padj/pval). Thin wrapper over
+# fk_dotplot_pathway(sort_by="signed") so the styling stays identical to the rest
+# of figkit; this just fixes the selection contract and the label cleanup.
+fk_gsea_kundishora <- function(fgsea_res, n_up = 10, n_down = 10,
+                               pathway_col = "pathway", nes_col = "NES",
+                               padj_col = "padj", strip = "^(HALLMARK|GOBP|REACTOME|KEGG)_",
+                               base_size = 12, x_label = "NES",
+                               theme = fk_get_theme()) {
+  d <- as.data.frame(fgsea_res)
+  if (!padj_col %in% names(d) && "pval" %in% names(d)) padj_col <- "pval"
+  d[[nes_col]]  <- suppressWarnings(as.numeric(d[[nes_col]]))
+  d[[padj_col]] <- pmax(suppressWarnings(as.numeric(d[[padj_col]])), 1e-300)
+  d <- d[is.finite(d[[nes_col]]) & is.finite(d[[padj_col]]), , drop = FALSE]
+  if (!nrow(d)) stop("fk_gsea_kundishora: no finite rows")
+  d[[pathway_col]] <- gsub("_", " ", sub(strip, "", as.character(d[[pathway_col]])))
+  # explicit symmetric selection, so it does not depend on top_n parity
+  up   <- utils::head(d[order(-d[[nes_col]]), , drop = FALSE], n_up)
+  down <- utils::head(d[order(d[[nes_col]]),  , drop = FALSE], n_down)
+  sel  <- unique(rbind(up, down))
+  fk_dotplot_pathway(sel, pathway_col = pathway_col, nes_col = nes_col,
+                     padj_col = padj_col, top_n = nrow(sel), sort_by = "nes",
+                     base_size = base_size, x_label = x_label, prettify = FALSE,
+                     theme = theme)
+}
+
 # ── Lollipop ────────────────────────────────────────────────────────────────
 fk_lollipop <- function(df, label_col = "source", value_col = "delta",
                         q_col = "q", top_n = 30, q_sig = 0.05,
