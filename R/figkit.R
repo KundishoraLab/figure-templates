@@ -359,27 +359,29 @@ fk_gsea_kundishora <- function(fgsea_res, n_up = 10, n_down = 10,
   d <- d[is.finite(d[[nes_col]]) & is.finite(d[[padj_col]]), , drop = FALSE]
   if (!nrow(d)) stop("fk_gsea_kundishora: no finite rows")
   d$.path <- gsub("_", " ", sub(strip, "", as.character(d[[pathway_col]])))
+  d$.path <- tools::toTitleCase(tolower(d$.path))
   d$.nlp  <- -log10(d[[padj_col]])
-  d$.dir  <- ifelse(d[[nes_col]] >= 0, "up", "down")
-  # symmetric selection: top n_up positive-NES + top n_down negative-NES, by significance
-  up   <- utils::head(d[d[[nes_col]] > 0, , drop = FALSE][order(-d$.nlp[d[[nes_col]] > 0]), ], n_up)
-  down <- utils::head(d[d[[nes_col]] < 0, , drop = FALSE][order(-d$.nlp[d[[nes_col]] < 0]), ], n_down)
+  # symmetric selection: top n_up positive-NES + top n_down negative-NES, by |NES|
+  up   <- utils::head(d[d[[nes_col]] > 0, , drop = FALSE][order(-d[[nes_col]][d[[nes_col]] > 0]), ], n_up)
+  down <- utils::head(d[d[[nes_col]] < 0, , drop = FALSE][order(d[[nes_col]][d[[nes_col]] < 0]), ], n_down)
   sel  <- unique(rbind(up, down))
   sel  <- sel[order(sel[[nes_col]]), , drop = FALSE]
   sel$.path <- factor(sel$.path, levels = sel$.path)
-  # The house GSEA dot plot: x = NES (sign = direction, so up and down are visibly split),
-  # DOT COLOUR = -log10(padj) — the magnitude of significance — on a low→high gradient, and dot
-  # SIZE also tracks it so faint hits recede. This is the encoding used across every pathway
-  # panel in the paper; do not recolour by NES (that hides which hits are actually significant).
+  # The house GSEA dot plot (matches gallery/02_dotplot_pathway.png):
+  #   x = NES, DOT COLOUR = NES on a diverging teal→white→magenta scale centred at 0 (the
+  #   magnitude AND direction of effect), DOT SIZE = -log10(FDR) (significance), black outline.
+  # Size legend is labelled with FDR values, not -log10 units.
+  lim  <- max(abs(sel[[nes_col]]), na.rm = TRUE)
+  fdrs <- c(0.05, 0.0025, 7.7e-06)
   ggplot2::ggplot(sel, ggplot2::aes(x = .data[[nes_col]], y = .data$.path)) +
-    ggplot2::geom_vline(xintercept = 0, linewidth = 0.4, colour = "grey55") +
-    ggplot2::geom_segment(ggplot2::aes(x = 0, xend = .data[[nes_col]],
-                                       y = .data$.path, yend = .data$.path),
-                          colour = "grey85", linewidth = 0.4) +
-    ggplot2::geom_point(ggplot2::aes(size = .data$.nlp, colour = .data$.nlp)) +
-    ggplot2::scale_colour_gradient(low = "grey80", high = theme$up,
-                                   name = expression(-log[10]~padj)) +
-    ggplot2::scale_size_continuous(range = c(2, 7), guide = "none") +
+    ggplot2::geom_vline(xintercept = 0, linetype = "dotted", linewidth = 0.4, colour = "grey55") +
+    ggplot2::geom_point(ggplot2::aes(size = .data$.nlp, fill = .data[[nes_col]]),
+                        shape = 21, colour = "black", stroke = 0.4) +
+    ggplot2::scale_fill_gradient2(low = theme$down, mid = "white", high = theme$up,
+                                  midpoint = 0, limits = c(-lim, lim), name = x_label) +
+    ggplot2::scale_size_continuous(range = c(2, 7.5), name = "FDR",
+                                   breaks = -log10(fdrs),
+                                   labels = formatC(fdrs, format = "g", digits = 2)) +
     ggplot2::labs(x = x_label, y = NULL) +
     fk_theme_pub(base_size = base_size, grid = FALSE)
 }
