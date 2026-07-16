@@ -272,6 +272,7 @@ fk_volcano <- function(df, x_col = "log2fc", y_col = "pvalue",
       p <- p + ggrepel::geom_text_repel(
         data = lab, aes(label = .data[[label_col]], colour = .data$.dir),
         size = base_size / 3.5, fontface = "plain", max.overlaps = Inf,
+        min.segment.length = 0, box.padding = 0.5, point.padding = 0.2,
         segment.colour = "#888", segment.size = 0.3, show.legend = FALSE)
     } else {
       message("  [volcano] ggrepel not installed; labels may overlap")
@@ -351,6 +352,8 @@ fk_gsea_kundishora <- function(fgsea_res, n_up = 10, n_down = 10,
                                pathway_col = "pathway", nes_col = "NES",
                                padj_col = "padj", strip = "^(HALLMARK|GOBP|REACTOME|KEGG)_",
                                base_size = 12, x_label = "NES", sig_line = 0.05,
+                               right_lab = NULL, left_lab = NULL,
+                               dir_cols = c(up = "#c51b8a", down = "#0a9396"),
                                theme = fk_get_theme()) {
   d <- as.data.frame(fgsea_res)
   if (!padj_col %in% names(d) && "pval" %in% names(d)) padj_col <- "pval"
@@ -373,17 +376,31 @@ fk_gsea_kundishora <- function(fgsea_res, n_up = 10, n_down = 10,
   # Size legend is labelled with FDR values, not -log10 units.
   lim  <- max(abs(sel[[nes_col]]), na.rm = TRUE)
   fdrs <- c(0.05, 0.0025, 7.7e-06)
-  ggplot2::ggplot(sel, ggplot2::aes(x = .data[[nes_col]], y = .data$.path)) +
+  p <- ggplot2::ggplot(sel, ggplot2::aes(x = .data[[nes_col]], y = .data$.path)) +
     ggplot2::geom_vline(xintercept = 0, linetype = "dotted", linewidth = 0.4, colour = "grey55") +
     ggplot2::geom_point(ggplot2::aes(size = .data$.nlp, fill = .data[[nes_col]]),
                         shape = 21, colour = "black", stroke = 0.4) +
-    ggplot2::scale_fill_gradient2(low = theme$down, mid = "white", high = theme$up,
+    ggplot2::scale_fill_gradient2(low = dir_cols[["down"]], mid = "white", high = dir_cols[["up"]],
                                   midpoint = 0, limits = c(-lim, lim), name = x_label) +
     ggplot2::scale_size_continuous(range = c(2, 7.5), name = "FDR",
                                    breaks = -log10(fdrs),
                                    labels = formatC(fdrs, format = "g", digits = 2)) +
     ggplot2::labs(x = x_label, y = NULL) +
     fk_theme_pub(base_size = base_size, grid = FALSE)
+  # optional coloured direction labels at the NES-axis ends (same convention as the volcanoes)
+  if (!is.null(right_lab) || !is.null(left_lab)) {
+    p <- p + ggplot2::coord_cartesian(clip = "off") +
+      ggplot2::theme(plot.margin = ggplot2::margin(6, 12, 30, 12))
+    if (!is.null(right_lab))
+      p <- p + ggplot2::annotate("text", x = lim, y = -Inf, vjust = 3.4, hjust = 1,
+                                 size = 3, fontface = "bold", colour = dir_cols[["up"]],
+                                 label = paste0(right_lab, " →"))
+    if (!is.null(left_lab))
+      p <- p + ggplot2::annotate("text", x = -lim, y = -Inf, vjust = 3.4, hjust = 0,
+                                 size = 3, fontface = "bold", colour = dir_cols[["down"]],
+                                 label = paste0("← ", left_lab))
+  }
+  p
 }
 
 # ── Lollipop ────────────────────────────────────────────────────────────────
