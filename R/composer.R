@@ -121,6 +121,19 @@ fk_legend_cell <- function(...) {
 fk_panel_png <- function(path)
   patchwork::wrap_elements(full = grid::rasterGrob(png::readPNG(path), interpolate = TRUE))
 
+# a watermarked placeholder box for a not-yet-drawn schematic / graphical abstract cell
+fk_placeholder <- function(label = "Graphical Abstract", watermark = "TEMPLATE") {
+  ggplot2::ggplot() +
+    ggplot2::annotate("rect", xmin = 0, xmax = 1, ymin = 0, ymax = 1,
+                      fill = "grey97", colour = "grey65", linewidth = 0.5) +
+    ggplot2::annotate("text", x = 0.5, y = 0.5, label = watermark, angle = 16,
+                      size = 11, colour = "grey88", fontface = "bold", family = NM$font_family) +
+    ggplot2::annotate("text", x = 0.5, y = 0.5, label = label,
+                      size = 5, colour = "grey40", fontface = "bold", family = NM$font_family) +
+    ggplot2::coord_cartesian(xlim = c(0, 1), ylim = c(0, 1), expand = FALSE) +
+    ggplot2::theme_void()
+}
+
 # save composite as PDF (cairo) + PNG + SVG (svglite, native text for Illustrator)
 fk_save_composite <- function(composite, stem, width = NM$width_in, height = NM$height_in) {
   dir.create(dirname(stem), recursive = TRUE, showWarnings = FALSE)
