@@ -380,23 +380,29 @@ fk_gsea_kundishora <- function(fgsea_res, n_up = 10, n_down = 10,
     ggplot2::geom_vline(xintercept = 0, linetype = "dotted", linewidth = 0.4, colour = "grey55") +
     ggplot2::geom_point(ggplot2::aes(size = .data$.nlp, fill = .data[[nes_col]]),
                         shape = 21, colour = "black", stroke = 0.4) +
+    # legend title = just the metric (drop the " (contrast)" suffix); the x-axis carries the full
+    # label, and the short form fits the fixed-width legend column without clipping.
     ggplot2::scale_fill_gradient2(low = dir_cols[["down"]], mid = "white", high = dir_cols[["up"]],
-                                  midpoint = 0, limits = c(-lim, lim), name = x_label) +
+                                  midpoint = 0, limits = c(-lim, lim),
+                                  name = sub("\\s*\\(.*", "", x_label)) +
     ggplot2::scale_size_continuous(range = c(2, 7.5), name = "FDR",
                                    breaks = -log10(fdrs),
                                    labels = formatC(fdrs, format = "g", digits = 2)) +
     ggplot2::labs(x = x_label, y = NULL) +
     fk_theme_pub(base_size = base_size, grid = FALSE)
-  # optional coloured direction labels at the NES-axis ends (same convention as the volcanoes)
+  # optional coloured direction labels at the NES-axis ends (same convention as the volcanoes).
+  # They sit just under the tick labels; the axis title is pushed further down so the two never
+  # collide (this block styles every Kundishora dotplot, so keep the separation generous).
   if (!is.null(right_lab) || !is.null(left_lab)) {
     p <- p + ggplot2::coord_cartesian(clip = "off") +
-      ggplot2::theme(plot.margin = ggplot2::margin(6, 12, 30, 12))
+      ggplot2::theme(plot.margin = ggplot2::margin(6, 12, 50, 12),
+                     axis.title.x = ggplot2::element_text(margin = ggplot2::margin(t = 34)))
     if (!is.null(right_lab))
-      p <- p + ggplot2::annotate("text", x = lim, y = -Inf, vjust = 3.4, hjust = 1,
+      p <- p + ggplot2::annotate("text", x = lim, y = -Inf, vjust = 3.6, hjust = 1,
                                  size = 3, fontface = "bold", colour = dir_cols[["up"]],
                                  label = paste0(right_lab, " →"))
     if (!is.null(left_lab))
-      p <- p + ggplot2::annotate("text", x = -lim, y = -Inf, vjust = 3.4, hjust = 0,
+      p <- p + ggplot2::annotate("text", x = -lim, y = -Inf, vjust = 3.6, hjust = 0,
                                  size = 3, fontface = "bold", colour = dir_cols[["down"]],
                                  label = paste0("← ", left_lab))
   }
@@ -549,16 +555,33 @@ fk_heatmap <- function(mat, symmetric = TRUE, cbar_label = "",
 # Writes PNG (to look at) + PDF (vector, for the composite). cairo_pdf keeps
 # text as text so the panel stays editable in Illustrator — the R-side
 # equivalent of matplotlib's pdf.fonttype = 42.
+# fk_save_panel: any panel that HAS a legend is saved with the legend lifted into a FIXED-WIDTH
+# column on the right, so the plot area no longer depends on how many letters the legend has (JNK).
+# `legend_width` is in inches. Plots with no legend are saved unchanged (reserving a blank column
+# there only compresses the panel and collides with the axis-end direction labels). Set
+# legend_width=0 to opt out entirely.
 fk_save_panel <- function(p, name, dir, width = 6, height = 5, dpi = 600,
-                          formats = c("png", "pdf")) {
+                          formats = c("png", "pdf"), legend_width = 1.8) {
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  composed <- p
+  if (is.finite(legend_width) && legend_width > 0 && (width - legend_width) > 1 &&
+      requireNamespace("patchwork", quietly = TRUE) && requireNamespace("cowplot", quietly = TRUE) &&
+      inherits(p, "ggplot")) {
+    lg <- tryCatch(suppressWarnings(cowplot::get_legend(p)), error = function(e) NULL)
+    has_leg <- !is.null(lg) && inherits(lg, "gtable") && length(lg$grobs) > 0
+    if (has_leg) {
+      body <- p + ggplot2::theme(legend.position = "none")
+      composed <- body + patchwork::wrap_elements(full = lg) +
+        patchwork::plot_layout(widths = grid::unit(c(1, legend_width), c("null", "in")))
+    }
+  }
   out <- character(0)
   for (ext in formats) {
     f <- file.path(dir, paste0(name, ".", ext))
     if (ext == "pdf") {
-      ggsave(f, p, width = width, height = height, device = grDevices::cairo_pdf)
+      ggsave(f, composed, width = width, height = height, device = grDevices::cairo_pdf)
     } else {
-      ggsave(f, p, width = width, height = height, dpi = dpi)
+      ggsave(f, composed, width = width, height = height, dpi = dpi)
     }
     out <- c(out, f)
   }
