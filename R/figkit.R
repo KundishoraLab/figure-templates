@@ -563,6 +563,13 @@ fk_heatmap <- function(mat, symmetric = TRUE, cbar_label = "",
 fk_save_panel <- function(p, name, dir, width = 6, height = 5, dpi = 600,
                           formats = c("png", "pdf"), legend_width = 1.8) {
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  # Also persist the RAW ggplot object as <name>.rds so per-figure composers can readRDS() it and
+  # re-theme it with one unified theme (the Kundishora composer pattern: producers save review-
+  # quality panels, the composer replaces the theme at assemble time for consistent fonts). Store
+  # width/height as attributes for the composer's aspect hints.
+  if (inherits(p, "ggplot"))
+    tryCatch({ attr(p, "fk_dim") <- c(width = width, height = height)
+               saveRDS(p, file.path(dir, paste0(name, ".rds"))) }, error = function(e) NULL)
   composed <- p
   if (is.finite(legend_width) && legend_width > 0 && (width - legend_width) > 1 &&
       requireNamespace("patchwork", quietly = TRUE) && requireNamespace("cowplot", quietly = TRUE) &&
