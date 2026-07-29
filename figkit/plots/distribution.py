@@ -24,6 +24,11 @@ Design decisions baked in, each one a failure mode that produced a wrong panel:
   floor, while a mitochondrial percentage (which must not be logged) came out
   spanning 10^-3 to 10^3. The caller knows what the quantity is; a heuristic
   does not, and it fails silently and plausibly.
+- **The y-axis hugs the data.** matplotlib autoscales `fill_betweenx` with
+  generous margins, which leaves a violin sitting in the bottom third of its
+  panel with most of the vertical space empty. Across a strip of QC panels that
+  wastes the axis every reader is trying to compare along. Limits are set from
+  the plotted range with a small margin instead.
 - **Points are off by default.** At 20,000 cells a strip plot is a filled
   rectangle. When on, it subsamples and says so, because a subsampled overlay
   that silently claims to be all the data is worse than none.
@@ -99,6 +104,7 @@ def violin(df, ax, value_col: str, group_col: str, order=None, palette=None,
         palette = categorical_palette(order, t.categorical)
     rng = np.random.default_rng(seed)
     summary = {}
+    lo_all, hi_all = np.inf, -np.inf
 
     for i, grp in enumerate(order):
         v = d.loc[d[group_col] == grp, value_col].to_numpy()
@@ -106,6 +112,9 @@ def violin(df, ax, value_col: str, group_col: str, order=None, palette=None,
             continue
         color = palette.get(grp, t.na)
         plot_v = np.log10(v[v > 0]) if log else v
+        if plot_v.size:
+            lo_all = min(lo_all, float(plot_v.min()))
+            hi_all = max(hi_all, float(plot_v.max()))
 
         if plot_v.size >= MIN_FOR_DENSITY:
             grid, dens = _density(plot_v)
@@ -143,6 +152,11 @@ def violin(df, ax, value_col: str, group_col: str, order=None, palette=None,
                     ax.plot([i - width / 2, i + width / 2], [y, y],
                             color=t.up, linestyle="--", linewidth=0.7, zorder=5)
 
+    # Hug the data — see module docstring.
+    if np.isfinite(lo_all) and hi_all > lo_all:
+        pad = 0.04 * (hi_all - lo_all)
+        ax.set_ylim(lo_all - pad, hi_all + pad)
+
     labels = [f"{g}\nn = {summary[g]['n']:,}" if show_n and g in summary else g
               for g in order]
     ax.set_xticks(np.arange(len(order)))
@@ -154,9 +168,11 @@ def violin(df, ax, value_col: str, group_col: str, order=None, palette=None,
         # Tick in real units on a log-transformed axis, so the reader never has
         # to exponentiate a label in their head.
         lo, hi = ax.get_ylim()
-        decades = np.arange(np.floor(lo), np.ceil(hi) + 1)
-        ax.set_yticks(decades)
-        ax.set_yticklabels([f"$10^{{{int(e)}}}$" for e in decades], fontsize=9)
+        decades = np.arange(np.ceil(lo), np.floor(hi) + 1)
+        if decades.size:
+            ax.set_yticks(decades)
+            ax.set_yticklabels([f"$10^{{{int(e)}}}$" for e in decades], fontsize=9)
+        ax.set_ylim(lo, hi)   # set_yticks can re-expand; put the limits back
 
     despine(ax)
     return {"groups": summary, "log": bool(log)}

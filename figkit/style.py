@@ -39,6 +39,12 @@ def apply_rcparams(theme: Theme | None = None, grid: bool = False) -> None:
         "axes.linewidth": 0.6, "axes.edgecolor": "black",
         "axes.spines.top": True, "axes.spines.right": True,
         "axes.grid": grid,
+        # Grey-93 major grid, matching the R track's theme_avm(). A grid is a
+        # reading aid and must sit behind the data — axisbelow=True is what
+        # stops gridlines being drawn over a violin body and looking like
+        # structure in the density.
+        "grid.color": "#EDEDED", "grid.linewidth": 0.5, "grid.linestyle": "-",
+        "axes.axisbelow": True,
         "savefig.dpi": t.dpi, "savefig.bbox": "tight",
         # Keep text editable in vector output — see docstring.
         "pdf.fonttype": 42, "ps.fonttype": 42, "svg.fonttype": "none",
