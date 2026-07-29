@@ -22,6 +22,7 @@ from .volcano import (
 )
 
 __all__ = [
+    "violin", "box",
     "volcano", "NOISE_GENE_PATTERNS", "CONTROL_PROBE_PATTERNS", "filter_labels",
     "dotplot_pathway", "dotplot_gsea", "dotplot_expression",
     "expression_matrix", "prettify_pathway",
@@ -33,3 +34,5 @@ __all__ = [
     "stacked_bar", "stacked_hbar", "ordered_bar",
     "chord", "chord_signed", "upset",
 ]
+
+from .distribution import violin, box  # noqa: E402,F401
