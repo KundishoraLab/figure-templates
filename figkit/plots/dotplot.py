@@ -214,10 +214,17 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
     from matplotlib.colors import Normalize
     vals = mean_df.values.ravel()
     if scale:
-        # Symmetric and fixed, not percentile-derived: zero has to sit at the
-        # middle of the ramp or a diverging cmap lies about the sign.
-        vmax = float(scale_clip)
-        norm = Normalize(vmin=-vmax, vmax=vmax)
+        # Over the observed range, not symmetric about zero and not
+        # percentile-derived, which is what Seurat's scale_color_gradient()
+        # does. It matters: with k groups a gene that is specific to one of
+        # them puts k-1 values at about -1/sqrt(k-1) and one at the clip, so a
+        # symmetric ramp would spend its whole cold half on values that never
+        # occur and render every negative cell the same lukewarm mid-tone.
+        vmin = float(np.nanmin(vals)) if np.isfinite(vals).any() else -1.0
+        vmax = float(np.nanmax(vals)) if np.isfinite(vals).any() else 1.0
+        if vmax <= vmin:
+            vmin, vmax = vmin - 0.5, vmin + 0.5
+        norm = Normalize(vmin=vmin, vmax=vmax)
     else:
         vmax = float(np.percentile(vals, vmax_pct)) if np.isfinite(vals).any() else 1.0
         norm = Normalize(vmin=0, vmax=vmax if vmax > 0 else 1.0)
