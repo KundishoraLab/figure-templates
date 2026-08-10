@@ -4,7 +4,7 @@ A modular publication-figure toolkit for single-cell, spatial and clinical
 omics, in **Python (matplotlib)** and **R (ggplot2)**.
 
 Volcano, UMAP/embedding, expression dotplot, pathway dotplot, heatmap,
-lollipop, composition bars, chord, UpSet — plus a JAMA-style table-forest,
+lollipop, composition bars, chord, UpSet, sankey — plus a JAMA-style table-forest,
 Kaplan-Meier curves, regression scatter and dumbbell. Each is a small function
 that takes an `ax` (or returns a `ggplot`), reads its colours from a swappable
 **theme**, and carries the design decisions that make the plot honest.
@@ -89,6 +89,7 @@ theme.sequential             # white -> up colormap
 | `figkit.plots.lollipop` | `lollipop` |
 | `figkit.plots.bars` | `stacked_bar`, `ordered_bar` |
 | `figkit.plots.network` | `chord`, `chord_signed`, `upset` |
+| `figkit.plots.sankey` | `sankey` |
 | `figkit` | `apply_rcparams`, `save_panel`, `despine`, `size_legend`, `quantile_norm`, palettes |
 
 R mirrors these as `fk_*` (`fk_volcano`, `fk_dotplot_pathway`, `fk_umap_categorical`,
@@ -151,6 +152,10 @@ fixes a failure mode that produced a wrong-looking figure at least once:
 - **Filtering is opt-in and prints what it dropped.** "Which genes are noise"
   is a per-assay call; silently dropping rows from someone else's DE table is
   the wrong default.
+- **`sankey` colours by source, not target.** A sankey is read left to right
+  and answers "where did each of these go"; colouring by destination turns it
+  into a different, worse plot that answers nothing the target axis doesn't
+  already say.
 
 ## Caveats worth knowing
 
@@ -165,6 +170,14 @@ fixes a failure mode that produced a wrong-looking figure at least once:
 - **Nominal vs adjusted p.** `volcano` doesn't care which you pass — small-n
   pseudobulk often saturates padj≈1 and flattens the plot. If you pass nominal
   p, label the axis and caption accordingly (`y_label` exists for this).
+- **Ribbon width is only good to about 20%.** `sankey` is the right panel for
+  "almost all of A became B" and the wrong one for 31% versus 27%. If the
+  reader needs to compare two ribbons that are not adjacent, they need a
+  heatmap; several published sankeys are heatmaps that lost their numbers.
+- **`sankey(normalize="source")` hides each source's n**, the same trade
+  `stacked_bar` makes — it is usually the right one for a label transfer,
+  because otherwise the largest cluster is the only legible one. Put the n in
+  the node label or the caption.
 - Fonts fall back to Helvetica/DejaVu if Arial is missing; panels stay
   reproducible but metrics shift slightly.
 

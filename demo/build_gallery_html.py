@@ -56,6 +56,8 @@ PANELS = [
      'chord_signed(m, "panels/chord", top_n_per_sign=14)'),
     ("13_upset", "UpSet", "Set intersections across modalities.",
      'upset(sets, "panels/upset", min_subset_size=1)'),
+    ("19_sankey", "Sankey", "Label transfer, as % of each query label.",
+     'sankey(crosstab, ax, normalize="source", min_flow=0.02)'),
 ]
 
 # R-only panels (demo/gallery_clinical.R). These have no Python twin — the
