@@ -164,9 +164,10 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
                        vmax_pct: float = 99.0, max_dot: float = 130.0,
                        group_colors=None, gene_colors=None,
                        dividers=None, block_labels=None,
-                       cbar_label: str = "mean expression",
+                       cbar_label: str | None = None,
                        show_size_legend: bool = True,
-                       swap_axes: bool = False):
+                       swap_axes: bool = False,
+                       scale: bool = False, scale_clip: float = 2.5):
     """Gene-by-group dotplot: color = mean expression, size = % expressing.
 
     Rows = groups, columns = genes (set `swap_axes=True` to transpose). Both
@@ -174,6 +175,15 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
 
     Color is scaled to the `vmax_pct` percentile rather than the max, so a
     single hot gene doesn't wash out every other column.
+
+    scale : z-score each gene across groups and clip to +/- `scale_clip`, which
+        is Seurat's `DotPlot(scale = TRUE)`. Use it when the panel's question is
+        "which group is this gene highest in"; leave it off when it is "how much
+        of this gene is there", because a z-score discards the level. A gene
+        with no variance across groups maps to 0. Note that z-scores are
+        estimated from as many observations as there are groups, so a group
+        built from a handful of cells moves every gene's mean — drop tiny
+        groups before scaling rather than after.
 
     group_colors / gene_colors : {label: hex} maps that tint the tick labels.
         Cheap and effective — it ties each row/column back to the contrast
@@ -188,6 +198,14 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
        list(mean_df.columns) != list(pct_df.columns):
         raise ValueError("dotplot_expression: mean_df and pct_df must share "
                          "index and columns")
+    if cbar_label is None:
+        cbar_label = "scaled expression" if scale else "mean expression"
+    # Per gene, over groups — so it has to happen while genes are still the
+    # columns, i.e. before swap_axes. ddof=1 to match R's scale().
+    if scale:
+        sd = mean_df.std(axis=0, ddof=1).replace(0.0, np.nan)
+        mean_df = (((mean_df - mean_df.mean(axis=0)) / sd)
+                   .fillna(0.0).clip(-scale_clip, scale_clip))
     if swap_axes:
         mean_df, pct_df = mean_df.T, pct_df.T
         group_colors, gene_colors = gene_colors, group_colors
@@ -195,8 +213,14 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
     cmap = cmap if cmap is not None else sequential_cmap(t.up, name="expr_seq")
     from matplotlib.colors import Normalize
     vals = mean_df.values.ravel()
-    vmax = float(np.percentile(vals, vmax_pct)) if np.isfinite(vals).any() else 1.0
-    norm = Normalize(vmin=0, vmax=vmax if vmax > 0 else 1.0)
+    if scale:
+        # Symmetric and fixed, not percentile-derived: zero has to sit at the
+        # middle of the ramp or a diverging cmap lies about the sign.
+        vmax = float(scale_clip)
+        norm = Normalize(vmin=-vmax, vmax=vmax)
+    else:
+        vmax = float(np.percentile(vals, vmax_pct)) if np.isfinite(vals).any() else 1.0
+        norm = Normalize(vmin=0, vmax=vmax if vmax > 0 else 1.0)
 
     rows, cols = list(mean_df.index), list(mean_df.columns)
 

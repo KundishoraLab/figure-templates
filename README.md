@@ -160,6 +160,13 @@ fixes a failure mode that produced a wrong-looking figure at least once:
 - **`dotplot_expression` does not normalise for you.** Pass an already
   log1p'd matrix; re-transforming an already-normalised matrix is a silent
   double-transform bug.
+- **`dotplot_expression(scale=True)` shows rank, not level.** It is Seurat's
+  `DotPlot(scale = TRUE)` — z-score per gene across groups, clipped to ±2.5 —
+  so the colour answers "which group is this gene highest in" and no longer
+  answers "how much of it is there". Each z-score is estimated from as many
+  observations as there are groups, so drop tiny groups *before* scaling; a
+  12-cell group otherwise moves every gene's mean. Two groups is degenerate
+  (every gene reads ±0.707).
 - **`top_n` selection is selection bias.** A top-DEG dotplot looks separated
   even under a null. If the contrast is near-null, say so in the caption.
 - **Nominal vs adjusted p.** `volcano` doesn't care which you pass — small-n
