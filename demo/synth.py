@@ -258,6 +258,32 @@ def interaction_matrix(seed: int = SEED) -> pd.DataFrame:
     return pd.DataFrame(m, index=cats, columns=cats)
 
 
+def label_transfer(seed: int = SEED) -> pd.DataFrame:
+    """Query labels x reference labels, as a label transfer's crosstab.
+
+    Built with the three shapes a real transfer has and a synthetic one
+    usually forgets: a strong diagonal, a merge where the reference's
+    vocabulary is coarser than the query's, and a query label the reference
+    has no name for at all, which has to land somewhere.
+    """
+    rng = np.random.RandomState(seed + 11)
+    query = ["Arterial EC", "Capillary EC", "Venous EC", "Pericytes",
+             "Smooth muscle cells", "Fibroblasts", "Proliferating EC"]
+    ref = ["Endothelial cells", "Mural cells", "Fibroblasts", "Unassigned"]
+    main = {"Arterial EC": 0, "Capillary EC": 0, "Venous EC": 0,
+            "Pericytes": 1, "Smooth muscle cells": 1, "Fibroblasts": 2,
+            "Proliferating EC": 0}
+    n = rng.randint(400, 4000, size=len(query))
+    m = np.zeros((len(query), len(ref)))
+    for i, q in enumerate(query):
+        w = rng.uniform(0.01, 0.06, size=len(ref))
+        w[main[q]] = rng.uniform(0.75, 0.95)
+        if q == "Proliferating EC":          # no reference name for it
+            w[main[q]], w[-1] = 0.35, 0.45
+        m[i] = np.round(w / w.sum() * n[i])
+    return pd.DataFrame(m, index=query, columns=ref)
+
+
 def gene_sets(seed: int = SEED) -> dict:
     """Named overlapping gene sets, for the upset demo."""
     rng = np.random.RandomState(seed + 9)
