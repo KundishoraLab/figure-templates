@@ -17,6 +17,7 @@ from .embedding import (
 from .heatmap import heatmap, heatmap_complex
 from .lollipop import lollipop, lollipop_tf
 from .network import chord, chord_signed, upset
+from .sankey import sankey
 from .volcano import (
     CONTROL_PROBE_PATTERNS, NOISE_GENE_PATTERNS, filter_labels, volcano,
 )
@@ -33,6 +34,7 @@ __all__ = [
     "lollipop", "lollipop_tf",
     "stacked_bar", "stacked_hbar", "ordered_bar",
     "chord", "chord_signed", "upset",
+    "sankey",
 ]
 
 from .distribution import violin, box  # noqa: E402,F401
