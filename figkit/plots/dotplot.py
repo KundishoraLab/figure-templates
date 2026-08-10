@@ -167,7 +167,8 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
                        cbar_label: str | None = None,
                        show_size_legend: bool = True,
                        swap_axes: bool = False,
-                       scale: bool = False, scale_clip: float = 2.5):
+                       scale: bool = False, scale_clip: float = 2.5,
+                       center: bool = False):
     """Gene-by-group dotplot: color = mean expression, size = % expressing.
 
     Rows = groups, columns = genes (set `swap_axes=True` to transpose). Both
@@ -184,6 +185,10 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
         estimated from as many observations as there are groups, so a group
         built from a handful of cells moves every gene's mean — drop tiny
         groups before scaling rather than after.
+    center : pin zero to the middle of the ramp (TwoSlopeNorm). Required with a
+        diverging cmap, whose midpoint colour claims to mean zero; wrong with a
+        two-colour gradient like Seurat's blue->red, which has no privileged
+        middle and should span the observed range instead.
 
     group_colors / gene_colors : {label: hex} maps that tint the tick labels.
         Cheap and effective — it ties each row/column back to the contrast
@@ -224,7 +229,17 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
         vmax = float(np.nanmax(vals)) if np.isfinite(vals).any() else 1.0
         if vmax <= vmin:
             vmin, vmax = vmin - 0.5, vmin + 0.5
-        norm = Normalize(vmin=vmin, vmax=vmax)
+        if center:
+            # For a diverging cmap the midpoint colour means zero, so zero has
+            # to land on it. TwoSlopeNorm rather than a symmetric Normalize
+            # because the two halves are not the same length here and forcing
+            # them to be wastes most of the ramp: scaled expression is skewed
+            # by construction, k-1 groups just below zero and one at the clip.
+            from matplotlib.colors import TwoSlopeNorm
+            norm = TwoSlopeNorm(vcenter=0.0, vmin=min(vmin, -1e-9),
+                                vmax=max(vmax, 1e-9))
+        else:
+            norm = Normalize(vmin=vmin, vmax=vmax)
     else:
         vmax = float(np.percentile(vals, vmax_pct)) if np.isfinite(vals).any() else 1.0
         norm = Normalize(vmin=0, vmax=vmax if vmax > 0 else 1.0)
