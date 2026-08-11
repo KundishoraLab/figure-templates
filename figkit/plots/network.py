@@ -21,9 +21,9 @@ def _require(mod: str, pkg: str):
             f"{pkg} is required for this plot: pip install {pkg}") from e
 
 
-def chord(matrix, fig_path, cmap=None, title: str = "", figsize=(5, 5),
-          keep_top_frac: float = 0.0, dpi: int = 600, formats=("png", "svg"),
-          theme: Theme | None = None):
+def chord(matrix, fig_path, cmap=None, sector_colors=None, title: str = "",
+          figsize=(5, 5), keep_top_frac: float = 0.0, dpi: int = 600,
+          formats=("png", "svg"), theme: Theme | None = None):
     """Chord diagram from a square sender x receiver matrix (unsigned).
 
     Writes to `fig_path` (extension-less) because pycirclize builds its own
@@ -33,13 +33,26 @@ def chord(matrix, fig_path, cmap=None, title: str = "", figsize=(5, 5),
     keep_top_frac : keep only the strongest fraction of links (0.1 = top 10%).
         A dense chord is unreadable, but thresholding hides data — say the
         threshold in the caption.
+    sector_colors : {sector: hex}, overriding `cmap`. Use it whenever the
+        sectors are entities that already have a colour elsewhere in the figure
+        — cell types, samples, conditions. A colormap assigns hue by position
+        around the circle, so the same entity changes colour between a chord and
+        the UMAP beside it, and re-sorting the matrix recolours everything.
+        Sectors absent from the dict raise rather than falling back, because a
+        silent default is how one entity ends up with two colours in one figure.
+    cmap : a matplotlib colormap *name*. pycirclize resolves it through the
+        registry, so a constructed Colormap object cannot be passed here.
+        Defaults to cycling `theme.categorical`, which is what sectors are —
+        unordered categories. It used to default to `theme.heatmap_cmap`, whose
+        `.name` is registered for no theme that builds its ramp with
+        `LinearSegmentedColormap.from_list`, so the no-argument call raised
+        `KeyError` rather than drawing anything.
     """
     _require("pycirclize", "pycirclize")
     from pycirclize import Circos
     import matplotlib.pyplot as plt
 
     t = resolve(theme)
-    cmap = cmap if cmap is not None else t.heatmap_cmap
     m = pd.DataFrame(matrix)
     arr = m.fillna(0).abs().to_numpy()
     if keep_top_frac > 0:
@@ -52,10 +65,19 @@ def chord(matrix, fig_path, cmap=None, title: str = "", figsize=(5, 5),
                   f"(top {keep_top_frac:.0%})")
 
     sectors = list(m.index)
+    if sector_colors is not None:
+        missing = [s for s in sectors if s not in sector_colors]
+        if missing:
+            raise ValueError(f"chord: sector_colors has no entry for {missing}")
+        colors = {s: sector_colors[s] for s in sectors}
+    elif cmap is not None:
+        colors = cmap
+    else:
+        colors = {s: t.categorical[i % len(t.categorical)]
+                  for i, s in enumerate(sectors)}
     circos = Circos.chord_diagram(
         pd.DataFrame(arr, index=sectors, columns=sectors),
-        space=4, r_lim=(95, 100),
-        cmap=cmap.name if hasattr(cmap, "name") else "tab20")
+        space=4, r_lim=(95, 100), cmap=colors)
     fig = circos.plotfig(figsize=figsize)
     if title:
         fig.suptitle(title, fontsize=12)
