@@ -42,7 +42,7 @@ from ..palettes import categorical_palette
 from ..style import despine
 from ..theme import Theme, resolve
 
-__all__ = ["violin", "box"]
+__all__ = ["violin", "box", "ranked_strip"]
 
 # Below this many observations a kernel density is decoration, not an estimate.
 MIN_FOR_DENSITY = 20
@@ -236,3 +236,72 @@ def box(df, ax, value_col: str, group_col: str, order=None, palette=None,
         ax.set_yticklabels([f"$10^{{{int(e)}}}$" for e in decades], fontsize=9)
     despine(ax)
     return {"groups": summary, "log": bool(log)}
+
+
+def ranked_strip(ax, values, reference=None, reference_label: str = "observed",
+                 order: str = "ascending", point_size: float = 14,
+                 color=None, reference_color=None, log: bool = False,
+                 y_label: str = "", x_label: str = "rank",
+                 annotate: bool = True, fontsize: float = 8,
+                 theme: Theme | None = None):
+    """A calibration bank: every value in a null distribution, ranked, with the
+    observed one marked against them.
+
+    This is the panel for "my test returned p = 0.22 — is that a null about the
+    biology, or a design that could never have returned anything?". A histogram
+    of the null answers it badly at the sizes this is for: 100 permutations or
+    100 random gene lists give a histogram whose shape is mostly binning, and
+    the tail — the only part that matters — is where the counts are smallest.
+    Ranked points show every draw, so the reader can see the floor, the density
+    near it, and where the observation sits, without a smoothing choice
+    intervening.
+
+    Returns the count and fraction of null values at least as extreme as
+    `reference`, which is the empirical p-value's numerator. `annotate` prints
+    it on the panel, because a calibration panel whose whole content is that
+    fraction should not make the reader compute it off the y-axis.
+
+    `order="ascending"` puts the most extreme draws at the left, which is where
+    a reader looks first and where the reference usually needs to be legible.
+    """
+    t = resolve(theme)
+    v = np.asarray(values, dtype=float)
+    v = v[np.isfinite(v)]
+    if not len(v):
+        raise ValueError("ranked_strip got no finite values")
+    v = np.sort(v) if order == "ascending" else np.sort(v)[::-1]
+    x = np.arange(1, len(v) + 1)
+    y = np.log10(v) if log else v
+
+    ax.scatter(x, y, s=point_size, color=color or t.na, edgecolors="none",
+               zorder=2, clip_on=False)
+
+    out = {"n_null": int(len(v))}
+    if reference is not None:
+        r = np.log10(reference) if log else reference
+        rc = reference_color or t.up
+        ax.axhline(r, color=rc, linewidth=1.0, zorder=3)
+        n_le = int((v <= reference).sum())
+        # (1 + k) / (1 + n): the observation is one draw from the same
+        # procedure, so excluding it from its own reference set biases the
+        # p-value down and can return an impossible zero.
+        emp = (1 + n_le) / (1 + len(v))
+        out.update(reference=float(reference), n_at_least_as_extreme=n_le,
+                   empirical_p=emp)
+        if annotate:
+            ax.annotate(
+                f"{reference_label} = {reference:.4g}\n"
+                f"{n_le} of {len(v)} null ≤ it · empirical p = {emp:.4f}",
+                xy=(0.98, 0.04), xycoords="axes fraction", ha="right",
+                va="bottom", fontsize=fontsize, color=rc)
+
+    ax.set_xlim(0, len(v) + 1)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    if log:
+        lo, hi = ax.get_ylim()
+        decades = np.arange(np.floor(lo), np.ceil(hi) + 1)
+        ax.set_yticks(decades)
+        ax.set_yticklabels([f"$10^{{{int(e)}}}$" for e in decades], fontsize=9)
+    despine(ax)
+    return out

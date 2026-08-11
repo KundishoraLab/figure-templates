@@ -11,8 +11,9 @@ from .dotplot import (
     prettify_pathway,
 )
 from .embedding import (
-    add_scale_bar, embedding_axes, embedding_categorical, embedding_continuous,
-    get_embedding, highlight_mask, side_legend, two_layer_scatter,
+    add_scale_bar, blend2, blend2_legend, embedding_axes, embedding_categorical,
+    embedding_continuous, get_embedding, highlight_mask, side_legend,
+    two_layer_scatter,
 )
 from .heatmap import heatmap, heatmap_complex
 from .lollipop import lollipop, lollipop_tf
@@ -23,12 +24,13 @@ from .volcano import (
 )
 
 __all__ = [
-    "violin", "box",
+    "violin", "box", "ranked_strip",
     "volcano", "NOISE_GENE_PATTERNS", "CONTROL_PROBE_PATTERNS", "filter_labels",
     "dotplot_pathway", "dotplot_gsea", "dotplot_expression",
     "expression_matrix", "prettify_pathway",
     "get_embedding", "embedding_axes", "embedding_categorical",
     "embedding_continuous", "two_layer_scatter", "highlight_mask",
+    "blend2", "blend2_legend",
     "side_legend", "add_scale_bar",
     "heatmap", "heatmap_complex",
     "lollipop", "lollipop_tf",
@@ -37,4 +39,4 @@ __all__ = [
     "sankey",
 ]
 
-from .distribution import violin, box  # noqa: E402,F401
+from .distribution import violin, box, ranked_strip  # noqa: E402,F401

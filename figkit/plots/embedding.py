@@ -178,6 +178,114 @@ def highlight_mask(ax, xy, mask, fg_color=None, label: str | None = None,
                              theme=theme, axes=axes, **axes_kw)
 
 
+def blend2(ax, xy, values_a, values_b, color_a, color_b,
+           low_color: str = "#eeeeee", both_color=None,
+           q_low: float = 0.05, q_high: float = 0.95,
+           point_size: float = 2.0, alpha: float = 0.9,
+           sort_by_value: bool = True, theme: Theme | None = None,
+           axes: bool = True, **axes_kw):
+    """One embedding coloured by *two* scores at once, for co-expression.
+
+    Two scores drawn as two panels answer "where is A" and "where is B" but not
+    "where are both", which is the question a co-expression panel exists for —
+    the reader has to hold one panel in memory and register it against the
+    other, and on a UMAP with no landmarks they cannot. This colours each point
+    by bilinear interpolation over a square whose corners are: neither (grey),
+    A only, B only, and both.
+
+    Returns the (n, 4) RGBA array actually drawn, so a caller can build the 2D
+    legend with `blend2_legend` from the same corners.
+
+    Both scores are quantile-normalised independently before blending. That is a
+    real decision and it cuts both ways: it makes the two channels comparable
+    when their raw ranges differ — module scores routinely do, since
+    `score_genes` centres on a control set whose size differs per module — but
+    it also means the panel shows *relative* co-expression within this cell
+    population and never absolute level. Do not read a blend as a magnitude.
+
+    `both_color` defaults to the multiplicative mix of A and B, which is darker
+    than either. The alternative, an additive mix, brightens toward white and
+    makes the double-positive corner the *least* salient one on the panel.
+    """
+    import matplotlib.colors as mcolors
+
+    t = resolve(theme)
+    xy = np.asarray(xy)
+
+    def unit(v):
+        v = np.asarray(v, dtype=float)
+        finite = v[np.isfinite(v)]
+        if not finite.size:
+            return np.zeros_like(v)
+        lo, hi = np.quantile(finite, q_low), np.quantile(finite, q_high)
+        if hi <= lo:                       # a score constant over its middle
+            lo, hi = finite.min(), finite.max()
+        if hi <= lo:                       # constant everywhere
+            return np.zeros_like(v)
+        # NaN maps to the low corner rather than dropping the point: a missing
+        # score is "not high here", and silently omitting the nucleus would
+        # leave a hole the reader reads as absence of cells.
+        return np.clip((np.nan_to_num(v, nan=lo) - lo) / (hi - lo), 0.0, 1.0)
+
+    a, b = unit(values_a), unit(values_b)
+    c00 = np.array(mcolors.to_rgb(low_color))
+    c10 = np.array(mcolors.to_rgb(color_a))
+    c01 = np.array(mcolors.to_rgb(color_b))
+    c11 = np.array(mcolors.to_rgb(both_color)) if both_color is not None \
+        else c10 * c01
+
+    w = a[:, None] * b[:, None]
+    rgb = ((1 - a[:, None]) * (1 - b[:, None]) * c00
+           + a[:, None] * (1 - b[:, None]) * c10
+           + (1 - a[:, None]) * b[:, None] * c01
+           + w * c11)
+    rgba = np.concatenate([np.clip(rgb, 0, 1),
+                           np.full((len(rgb), 1), float(alpha))], axis=1)
+
+    order = np.argsort(a + b) if sort_by_value else np.arange(len(a))
+    ax.scatter(xy[order, 0], xy[order, 1], c=rgba[order], s=point_size,
+               edgecolors="none", rasterized=True)
+    if axes:
+        embedding_axes(ax, **axes_kw)
+    return rgba
+
+
+def blend2_legend(ax, color_a, color_b, label_a: str = "A", label_b: str = "B",
+                  low_color: str = "#eeeeee", both_color=None, n: int = 64,
+                  fontsize: float = 8):
+    """The 2D colour square that makes a `blend2` panel readable.
+
+    A blend without this legend is uninterpretable — the reader is looking at a
+    colour they have no key for. Pass the same corner colours you passed to
+    `blend2`; the square is rendered from them rather than from the data, so it
+    cannot drift out of step with the panel.
+    """
+    import matplotlib.colors as mcolors
+
+    c00 = np.array(mcolors.to_rgb(low_color))
+    c10 = np.array(mcolors.to_rgb(color_a))
+    c01 = np.array(mcolors.to_rgb(color_b))
+    c11 = np.array(mcolors.to_rgb(both_color)) if both_color is not None \
+        else c10 * c01
+
+    g = np.linspace(0, 1, n)
+    A, B = np.meshgrid(g, g, indexing="ij")
+    sq = ((1 - A)[..., None] * (1 - B)[..., None] * c00
+          + A[..., None] * (1 - B)[..., None] * c10
+          + (1 - A)[..., None] * B[..., None] * c01
+          + (A * B)[..., None] * c11)
+    # origin="lower" so the low/low corner is bottom-left, matching the axis
+    # direction the labels imply. Without it the square is vertically mirrored
+    # and the legend says the opposite of what the panel shows.
+    ax.imshow(np.clip(sq, 0, 1).transpose(1, 0, 2), origin="lower",
+              extent=(0, 1, 0, 1), interpolation="bilinear", aspect="equal")
+    ax.set_xlabel(label_a, fontsize=fontsize)
+    ax.set_ylabel(label_b, fontsize=fontsize)
+    ax.set_xticks([]); ax.set_yticks([])
+    despine(ax, "all")
+    return ax
+
+
 def side_legend(ax, items, title: str = "", loc: str = "side",
                 markersize: float = 7, fontsize: float = 9, ncol: int = 1):
     """Legend built from (label, color) pairs.
