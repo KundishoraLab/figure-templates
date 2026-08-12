@@ -25,7 +25,7 @@ from figkit.plots import (  # noqa: E402
     CONTROL_PROBE_PATTERNS, NOISE_GENE_PATTERNS, add_scale_bar, chord_signed,
     dotplot_expression, dotplot_pathway, embedding_categorical,
     embedding_continuous, heatmap, highlight_mask, lollipop, ordered_bar,
-    stacked_bar, upset, volcano,
+    sankey, stacked_bar, upset, volcano,
 )
 import synth  # noqa: E402
 
@@ -265,6 +265,18 @@ def _upset(out, theme):
         print(f"  [skip] {e}")
         return {"skipped": "upsetplot not installed"}
     return {"n_sets": len(sets)}
+
+
+# ── sankey ──────────────────────────────────────────────────────────────────
+@panel("sankey", "Label transfer: where each query label landed in the "
+                 "reference's vocabulary.")
+def _sankey(out, theme):
+    m = synth.label_transfer()
+    fig, ax = plt.subplots(figsize=(7.0, 4.2))
+    stats = sankey(m, ax, normalize="source", min_flow=0.02,
+                   source_label="Query", target_label="Reference", theme=theme)
+    save(fig, "19_sankey", out)
+    return stats
 
 
 def main() -> int:
