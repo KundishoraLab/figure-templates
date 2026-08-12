@@ -15,7 +15,7 @@ from .embedding import (
     get_embedding, highlight_mask, side_legend, two_layer_scatter,
 )
 from .heatmap import heatmap, heatmap_complex
-from .lollipop import lollipop, lollipop_tf
+from .lollipop import dumbbell, lollipop, lollipop_tf
 from .network import chord, chord_signed, upset
 from .volcano import (
     CONTROL_PROBE_PATTERNS, NOISE_GENE_PATTERNS, filter_labels, volcano,
@@ -29,7 +29,7 @@ __all__ = [
     "embedding_continuous", "two_layer_scatter", "highlight_mask",
     "side_legend", "add_scale_bar",
     "heatmap", "heatmap_complex",
-    "lollipop", "lollipop_tf",
+    "lollipop", "lollipop_tf", "dumbbell",
     "stacked_bar", "stacked_hbar", "ordered_bar",
     "chord", "chord_signed", "upset",
 ]

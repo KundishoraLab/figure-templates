@@ -120,3 +120,74 @@ def lollipop(df, ax, label_col: str = "source", value_col: str = "delta",
 
 # Back-compat alias for the original name.
 lollipop_tf = lollipop
+
+
+def dumbbell(ax, labels, a_values, b_values, a_label: str = "A",
+             b_label: str = "B", a_color=None, b_color=None,
+             y_label: str = "", italic_labels: bool = False,
+             legend: bool = True, rotation: int = 0, point_size: float = 16.0,
+             connector_color: str = "#C4C4C4", connector_width: float = 1.0,
+             legend_loc: str = "upper right", theme: Theme | None = None):
+    """Two measurements of the same feature, joined so the gap is the subject.
+
+    `labels`, `a_values` and `b_values` are parallel sequences over one x axis.
+    Both values are drawn as points on a shared scale with a connector between
+    them, so what the reader measures is the *distance* — which is the quantity
+    a two-series bar chart makes hardest to see, because each bar is read from
+    the axis and the difference has to be done in the head.
+
+    Nothing is sorted and nothing is dropped. Order is the caller's, because on
+    these panels the x axis is usually grouped into blocks that `group_strip`
+    then annotates, and re-ordering here would silently break the alignment
+    between the strip and the ticks.
+
+    NaN in either series is left as a gap rather than filled or skipped: the
+    feature keeps its tick, so the strip below still lines up, and a missing
+    measurement does not masquerade as a small one.
+
+    Draws its own key unless `legend=False`, because the two colours are the
+    whole encoding. It is a normal axes legend, so a caller that also wants a
+    `group_strip` must keep the handle and re-add it:
+
+        dumbbell(ax, ...); leg = ax.get_legend()
+        group_strip(ax, counts); ax.add_artist(leg)
+
+    Returns the legend, or None.
+    """
+    t = resolve(theme)
+    a_c = a_color or t.categorical[0]
+    b_c = b_color or t.categorical[1]
+    labels = list(labels)
+    a = np.asarray(a_values, dtype=float)
+    b = np.asarray(b_values, dtype=float)
+    if not (len(labels) == a.size == b.size):
+        raise ValueError(f"dumbbell: {len(labels)} labels but {a.size} a-values "
+                         f"and {b.size} b-values")
+
+    x = np.arange(len(labels))
+    both = np.isfinite(a) & np.isfinite(b)
+    ax.vlines(x[both], a[both], b[both], color=connector_color,
+              linewidth=connector_width, zorder=1)
+    ax.scatter(x, a, s=point_size, color=a_c, linewidths=0, zorder=3,
+               label=a_label)
+    ax.scatter(x, b, s=point_size, color=b_c, linewidths=0, zorder=3,
+               label=b_label)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=rotation,
+                       ha="right" if rotation else "center",
+                       style="italic" if italic_labels else "normal")
+    ax.set_xlim(-0.7, len(labels) - 0.3)
+    ax.set_ylabel(y_label)
+    # Horizontal only. A vertical gridline through a categorical axis separates
+    # nothing that position has not already separated, and here it would run
+    # straight down the connector it is meant to sit behind.
+    ax.grid(visible=True, axis="y")
+    ax.grid(visible=False, axis="x")
+
+    leg = None
+    if legend:
+        leg = ax.legend(loc=legend_loc, ncol=2, frameon=False, fontsize=7,
+                        handletextpad=0.2, columnspacing=1.2, borderaxespad=0.1)
+    despine(ax)
+    return leg
