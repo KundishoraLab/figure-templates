@@ -225,3 +225,129 @@ def add_scale_bar(ax, length: float = 1.0, label: str | None = None,
                  else f"{length:g} {unit}")
     ax.text(0.5 * (x0 + x1), y0 + 0.35 * pad_y, label, ha="center",
             va="bottom", fontsize=fontsize, color=color, zorder=10)
+
+
+def embedding_outline(ax, xy, labels, palette=None, order=None,
+                      coverage: float = 0.90, smooth: float = 1.0,
+                      min_area_frac: float = 0.0, grid: int = 256,
+                      linewidth: float = 1.1, legend: bool = False,
+                      legend_title: str = "", legend_y: float = -0.12,
+                      theme: Theme | None = None):
+    """Where each group sits, as a contour instead of a colour.
+
+    Draws, per group, the smallest region containing `coverage` of that group's
+    points. Use it when the scatter's colour is already spent on something else
+    — a score, a pseudotime — and re-colouring by group would cost the panel
+    the encoding it exists for. It also answers a question a coloured scatter
+    answers badly at scale: with tens of thousands of overplotted points,
+    whichever group is drawn last looks like it occupies the whole embedding.
+
+    **The bandwidth is shared across groups**, derived once from the pooled
+    points. This is the argument for the function existing rather than each
+    caller contouring its own KDE. Per-group bandwidths scale with group size,
+    so a smaller group is smoothed with a fatter kernel and its territory comes
+    out looking larger — an artefact that runs in the same direction as the
+    biology in every depleted-population comparison, and is invisible in the
+    output.
+
+    coverage      : fraction of the group's points inside the contour. This is
+      a mass threshold on the density, not a quantile of any one axis, so the
+      region can be several pieces — and is left as several, because merging
+      them would draw a boundary through empty space.
+    smooth        : multiplies the shared bandwidth. Above 1 for a summary; at
+      the automatic bandwidth a contour tracks every local fluctuation and
+      throws off specks in sparse regions, which read as satellite populations.
+    min_area_frac : drop contour pieces smaller than this fraction of the
+      group's total enclosed area. The specks again — a piece holding a handful
+      of points is noise in the density, not a subpopulation. Reports what it
+      dropped, because a silently simplified contour is a claim about where a
+      group is not.
+    grid          : mesh resolution. Below about 150 the contour polygonises.
+
+    Returns {group: fraction of the panel its contour encloses}.
+    """
+    from matplotlib.patheffects import withStroke
+    from scipy.ndimage import gaussian_filter, label as cc_label
+
+    t = resolve(theme)
+    xy = np.asarray(xy, dtype=float)
+    labels = np.asarray(pd.Series(labels).astype(str))
+    if xy.shape[0] != labels.size:
+        raise ValueError(f"embedding_outline: {xy.shape[0]} points but "
+                         f"{labels.size} labels")
+    if not 0.0 < coverage < 1.0:
+        raise ValueError("embedding_outline: coverage must be in (0, 1), "
+                         f"got {coverage}")
+
+    if order is None:
+        order = list(pd.unique(labels))
+    else:
+        order = [str(o) for o in order]
+    if palette is None:
+        palette = categorical_palette(order, t.categorical)
+
+    # One grid and one bandwidth for every group — see the docstring.
+    (lo_x, lo_y), (hi_x, hi_y) = xy.min(0), xy.max(0)
+    mx, my = 0.06 * (hi_x - lo_x), 0.06 * (hi_y - lo_y)
+    lo_x, hi_x, lo_y, hi_y = lo_x - mx, hi_x + mx, lo_y - my, hi_y + my
+    xe = np.linspace(lo_x, hi_x, grid + 1)
+    ye = np.linspace(lo_y, hi_y, grid + 1)
+    xc, yc = 0.5 * (xe[:-1] + xe[1:]), 0.5 * (ye[:-1] + ye[1:])
+    # Scott's rule on the pooled points, expressed in grid cells.
+    scott = xy.shape[0] ** (-1.0 / 6.0)
+    sx = smooth * scott * xy[:, 0].std() / ((hi_x - lo_x) / grid)
+    sy = smooth * scott * xy[:, 1].std() / ((hi_y - lo_y) / grid)
+
+    areas = {}
+    for g in order:
+        pts = xy[labels == g]
+        if pts.shape[0] < 3:
+            print(f"  [embedding_outline] {g}: {pts.shape[0]} points — skipped")
+            continue
+        counts, _, _ = np.histogram2d(pts[:, 0], pts[:, 1], bins=[xe, ye])
+        dens = gaussian_filter(counts, sigma=(sx, sy), mode="constant")
+        total = dens.sum()
+        if total <= 0:
+            continue
+        dens /= total
+        # The level enclosing `coverage` of the mass: sort cells by density and
+        # walk down until the cumulative mass reaches it.
+        flat = np.sort(dens.ravel())[::-1]
+        cum = np.cumsum(flat)
+        level = float(flat[min(int(np.searchsorted(cum, coverage)), flat.size - 1)])
+
+        keep = dens >= level
+        if min_area_frac > 0:
+            comps, n_comp = cc_label(keep)
+            if n_comp > 1:
+                sizes = np.bincount(comps.ravel())[1:]
+                drop = [i + 1 for i, s in enumerate(sizes)
+                        if s < min_area_frac * sizes.sum()]
+                if drop:
+                    print(f"  [embedding_outline] {g}: dropped {len(drop)} of "
+                          f"{n_comp} pieces below {min_area_frac:.0%} of its area")
+                    keep &= ~np.isin(comps, drop)
+        # Contour the density, not the mask: a binary mask contours as a
+        # staircase along the cell edges.
+        cs = ax.contour(xc, yc, np.where(keep, dens, 0.0).T, levels=[level],
+                        colors=[palette.get(g, t.na)], linewidths=linewidth,
+                        zorder=6)
+        # White halo. The contour runs over the scatter it describes, and a
+        # bare 1.1 pt line crossing a dense region is the same width as the
+        # gaps between points — it disappears exactly where the group is
+        # densest, which is where the reader is looking.
+        cs.set(path_effects=[withStroke(linewidth=3 * linewidth,
+                                        foreground="white")])
+        areas[g] = float(keep.sum()) / keep.size
+
+    if legend:
+        from matplotlib.lines import Line2D
+        ax.legend(handles=[Line2D([0], [0], color=palette.get(g, t.na),
+                                  linewidth=linewidth, label=g)
+                           for g in order if g in areas],
+                  loc="upper center", bbox_to_anchor=(0.5, legend_y),
+                  ncol=max(len(areas), 1), frameon=False, fontsize=8,
+                  title=legend_title, title_fontsize=8,
+                  handlelength=1.6, handletextpad=0.5, columnspacing=1.6,
+                  borderaxespad=0)
+    return areas

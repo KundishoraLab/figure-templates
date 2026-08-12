@@ -14,6 +14,9 @@ from .embedding import (
     add_scale_bar, embedding_axes, embedding_categorical, embedding_continuous,
     get_embedding, highlight_mask, side_legend, two_layer_scatter,
 )
+# Kept out of the block above so this stays a one-line addition -- the
+# wrapped import list is rewrapped by several feature branches at once.
+from .embedding import embedding_outline
 from .heatmap import heatmap, heatmap_complex
 from .lollipop import lollipop, lollipop_tf
 from .network import chord, chord_signed, upset
@@ -28,6 +31,7 @@ __all__ = [
     "get_embedding", "embedding_axes", "embedding_categorical",
     "embedding_continuous", "two_layer_scatter", "highlight_mask",
     "side_legend", "add_scale_bar",
+    "embedding_outline",
     "heatmap", "heatmap_complex",
     "lollipop", "lollipop_tf",
     "stacked_bar", "stacked_hbar", "ordered_bar",
