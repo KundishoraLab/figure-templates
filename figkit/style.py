@@ -110,7 +110,7 @@ def size_legend(ax, values, size_fn, label_fn=str, title: str = "",
 def group_strip(ax, counts, palette=None, legend_cols: int = 3,
                 extra_handles=None, pad_pt: float = 3.6, height: float = 0.036,
                 legend_y: float = -0.60, fontsize: float = 7.5,
-                theme: Theme | None = None):
+                backing: float = 0.040, theme: Theme | None = None):
     """Annotate contiguous runs of the x axis with a colour bar and a key.
 
     `counts` is an ordered {group: n_categories} mapping over the x axis, read
@@ -128,6 +128,13 @@ def group_strip(ax, counts, palette=None, legend_cols: int = 3,
     tick marks — which are a fixed physical length whatever the panel is. At
     the default the strip starts just past a 3.5 pt tick; shrink the panel with
     a fractional offset instead and the ticks end up drawn through the strip.
+
+    `backing` is a white band the full width of the axes that the coloured runs
+    sit centred inside. It is not decoration: the runs only span the data range,
+    so without it the strip stops short of the axes on both sides and the last
+    category's colour appears to bleed into the page. It also gives the run
+    boundaries — drawn as white 0.6 pt strokes — something to read against
+    wherever the figure is placed on a tinted background.
 
     This exists instead of text over the plot. Labelling groups in the data area
     puts ink where the reader is measuring, and it collides as soon as a
@@ -156,16 +163,23 @@ def group_strip(ax, counts, palette=None, legend_cols: int = 3,
     }
 
     fig = ax.figure
-    trans = (blended_transform_factory(ax.transData, ax.transAxes)
-             + ScaledTranslation(0, -pad_pt / 72.0, fig.dpi_scale_trans))
+    drop = ScaledTranslation(0, -pad_pt / 72.0, fig.dpi_scale_trans)
+    trans = blended_transform_factory(ax.transData, ax.transAxes) + drop
 
+    ax.add_patch(mpatches.Rectangle(
+        (0, -backing), 1, backing,
+        transform=blended_transform_factory(ax.transAxes, ax.transAxes) + drop,
+        clip_on=False, facecolor="white", edgecolor="none", zorder=4))
+
+    inset = (backing - height) / 2
     start = 0
     for g, n in counts.items():
         if n <= 0:
             continue
         ax.add_patch(mpatches.Rectangle(
-            (start - 0.5, -height), n, height, transform=trans, clip_on=False,
-            facecolor=pal[g], edgecolor="white", linewidth=0.6, zorder=5))
+            (start - 0.5, -(backing - inset)), n, height, transform=trans,
+            clip_on=False, facecolor=pal[g], edgecolor="white", linewidth=0.6,
+            zorder=5))
         start += n
 
     # Push the tick labels clear of the strip. Without this they are drawn at
@@ -175,7 +189,7 @@ def group_strip(ax, counts, palette=None, legend_cols: int = 3,
     # before the caller's tight_layout, so this over-reserves rather than
     # under-reserves; erring the other way would put the strip back on the ticks.
     ax_h_pt = ax.get_position().height * fig.get_figheight() * 72.0
-    ax.tick_params(axis="x", pad=pad_pt + height * ax_h_pt)
+    ax.tick_params(axis="x", pad=pad_pt + backing * ax_h_pt)
 
     handles = [mpatches.Patch(facecolor=pal[g], edgecolor="none", label=g)
                for g, n in counts.items() if n > 0]
