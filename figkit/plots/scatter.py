@@ -90,6 +90,12 @@ def scatter_fit(df, ax, x_col: str, y_col: str, group_col: str | None = None,
     module docstring on why no between-group p is returned.
 
     `group_col=None` fits the whole frame as one group.
+
+    fontsize sets the legend, the axis labels and the tick labels together. They
+    are one knob rather than three because this plot is usually a small panel
+    beside a larger one, and a caller who shrinks only the legend is left with
+    axis labels inherited from rcParams that can be a third of the panel's
+    height.
     """
     t = resolve(theme)
     d = df[[c for c in {x_col, y_col, group_col} if c]].dropna()
@@ -123,8 +129,9 @@ def scatter_fit(df, ax, x_col: str, y_col: str, group_col: str | None = None,
                    linewidths=0.4, alpha=alpha, zorder=3, label=label)
         rows.append({"group": g, **s})
 
-    ax.set_xlabel(x_label if x_label is not None else x_col)
-    ax.set_ylabel(y_label if y_label is not None else y_col)
+    ax.set_xlabel(x_label if x_label is not None else x_col, fontsize=fontsize)
+    ax.set_ylabel(y_label if y_label is not None else y_col, fontsize=fontsize)
+    ax.tick_params(labelsize=fontsize)
     if legend and group_col is not None:
         ax.legend(loc=legend_loc, frameon=False, fontsize=fontsize)
     despine(ax)
