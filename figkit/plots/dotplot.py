@@ -168,7 +168,10 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
                        show_size_legend: bool = True,
                        swap_axes: bool = False,
                        scale: bool = False, scale_clip: float = 2.5,
-                       center: bool = False):
+                       center: bool = False,
+                       vmin: float | None = None, vmax: float | None = None,
+                       col_rotation: int = 70, label_size: float | None = None,
+                       colorbar: bool = True):
     """Gene-by-group dotplot: color = mean expression, size = % expressing.
 
     Rows = groups, columns = genes (set `swap_axes=True` to transpose). Both
@@ -196,6 +199,22 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
     dividers : x positions (after the Nth column) to draw a dashed separator,
         for visually blocking e.g. up-genes from down-genes.
     block_labels : [(x_center, text, color)] headers drawn above the blocks.
+
+    vmin / vmax : pin the colour limits instead of deriving them per call. Pass
+        both whenever a set of panels is meant to be compared to each other:
+        the `vmax_pct` default is computed from the data in front of it, so
+        three organoid panels drawn separately each get their own ramp and the
+        weakest is rendered as strongly as the strongest. Nothing warns about
+        that — the panels simply lie side by side.
+    col_rotation : column-label angle. 70 is right when the labels are long
+        enough to overlap otherwise; 45 reads better when they fit, because a
+        near-vertical name is read one character at a time.
+    label_size : one font size for both tick axes. Defaults to the built-in
+        10 / 8 split.
+    colorbar : draw the colourbar. Turn it off when the panel also carries
+        furniture this function cannot see — a `group_strip`, a shared bar
+        across a row of panels — and place it from the caller, which is the
+        only place that knows the final layout.
     """
     t = resolve(theme)
     mean_df, pct_df = pd.DataFrame(mean_df), pd.DataFrame(pct_df)
@@ -218,6 +237,7 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
     cmap = cmap if cmap is not None else sequential_cmap(t.up, name="expr_seq")
     from matplotlib.colors import Normalize
     vals = mean_df.values.ravel()
+    finite = np.isfinite(vals).any()
     if scale:
         # Over the observed range, not symmetric about zero and not
         # percentile-derived, which is what Seurat's scale_color_gradient()
@@ -225,24 +245,34 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
         # them puts k-1 values at about -1/sqrt(k-1) and one at the clip, so a
         # symmetric ramp would spend its whole cold half on values that never
         # occur and render every negative cell the same lukewarm mid-tone.
-        vmin = float(np.nanmin(vals)) if np.isfinite(vals).any() else -1.0
-        vmax = float(np.nanmax(vals)) if np.isfinite(vals).any() else 1.0
-        if vmax <= vmin:
-            vmin, vmax = vmin - 0.5, vmin + 0.5
-        if center:
-            # For a diverging cmap the midpoint colour means zero, so zero has
-            # to land on it. TwoSlopeNorm rather than a symmetric Normalize
-            # because the two halves are not the same length here and forcing
-            # them to be wastes most of the ramp: scaled expression is skewed
-            # by construction, k-1 groups just below zero and one at the clip.
-            from matplotlib.colors import TwoSlopeNorm
-            norm = TwoSlopeNorm(vcenter=0.0, vmin=min(vmin, -1e-9),
-                                vmax=max(vmax, 1e-9))
-        else:
-            norm = Normalize(vmin=vmin, vmax=vmax)
+        lo = float(np.nanmin(vals)) if finite else -1.0
+        hi = float(np.nanmax(vals)) if finite else 1.0
+        if hi <= lo:
+            lo, hi = lo - 0.5, lo + 0.5
     else:
-        vmax = float(np.percentile(vals, vmax_pct)) if np.isfinite(vals).any() else 1.0
-        norm = Normalize(vmin=0, vmax=vmax if vmax > 0 else 1.0)
+        lo = 0.0
+        hi = float(np.percentile(vals, vmax_pct)) if finite else 1.0
+        if hi <= lo:
+            hi = 1.0
+    # An explicit limit is a claim about a set of panels, so it outranks
+    # anything derived from the one in front of us.
+    if vmin is not None:
+        lo = float(vmin)
+    if vmax is not None:
+        hi = float(vmax)
+    if hi <= lo:
+        raise ValueError(f"dotplot_expression: vmax ({hi}) must exceed vmin ({lo})")
+
+    if scale and center:
+        # For a diverging cmap the midpoint colour means zero, so zero has to
+        # land on it. TwoSlopeNorm rather than a symmetric Normalize because
+        # the two halves are not the same length here and forcing them to be
+        # wastes most of the ramp: scaled expression is skewed by construction,
+        # k-1 groups just below zero and one at the clip.
+        from matplotlib.colors import TwoSlopeNorm
+        norm = TwoSlopeNorm(vcenter=0.0, vmin=min(lo, -1e-9), vmax=max(hi, 1e-9))
+    else:
+        norm = Normalize(vmin=lo, vmax=hi)
 
     rows, cols = list(mean_df.index), list(mean_df.columns)
 
@@ -259,9 +289,11 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
                     edgecolors="#333", linewidths=0.25, zorder=3)
 
     ax.set_yticks(range(len(rows)))
-    ax.set_yticklabels(rows, fontsize=10)
+    ax.set_yticklabels(rows, fontsize=10 if label_size is None else label_size)
     ax.set_xticks(range(len(cols)))
-    ax.set_xticklabels(cols, rotation=70, fontsize=8, ha="right")
+    ax.set_xticklabels(cols, rotation=col_rotation,
+                       fontsize=8 if label_size is None else label_size,
+                       ha="right" if col_rotation else "center")
     if group_colors:
         for lab, tick in zip(rows, ax.get_yticklabels()):
             if lab in group_colors:
@@ -285,10 +317,12 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
     ax.set_ylim(header_y - 0.35 if block_labels else -0.6, len(rows) - 0.5)
     ax.invert_yaxis()
 
-    import matplotlib.pyplot as plt
-    cb = plt.colorbar(sc, ax=ax, fraction=0.03, pad=0.02)
-    cb.ax.tick_params(labelsize=9)
-    cb.set_label(cbar_label, fontsize=10)
+    cb = None
+    if colorbar:
+        import matplotlib.pyplot as plt
+        cb = plt.colorbar(sc, ax=ax, fraction=0.03, pad=0.02)
+        cb.ax.tick_params(labelsize=9)
+        cb.set_label(cbar_label, fontsize=10)
 
     if show_size_legend:
         size_legend(ax, [25, 50, 100], _size, label_fn=lambda v: f"{v:g}%",
@@ -296,4 +330,124 @@ def dotplot_expression(mean_df, pct_df, ax, cmap=None,
         ax.get_legend().set_bbox_to_anchor((1.06, 1.0))
 
     despine(ax, "all")
-    return {"n_groups": len(rows), "n_genes": len(cols), "vmax": vmax}
+    # `scatter` is the mappable. A caller that suppressed the colourbar needs it
+    # to draw its own, and there is no other way to get back a norm+cmap pair
+    # that is guaranteed to match the dots.
+    return {"n_groups": len(rows), "n_genes": len(cols),
+            "vmin": lo, "vmax": hi, "scatter": sc, "colorbar": cb,
+            "size_fn": _size}
+
+
+# Below this, a q-value stops buying dot area. Without a floor one term at
+# q=1e-40 sets the scale and every other dot collapses to the same speck —
+# the panel then encodes "is anything significant", which it already knows.
+FDR_FLOOR = 1e-4
+
+
+def dotplot_matrix(value_df, ax, size_df=None, cmap=None,
+                   size_range=(18.0, 98.0), col_rotation: int = 45,
+                   rule_after: int | None = None, rule_label: str | None = None,
+                   cbar_label: str | None = None, label_size: float | None = None,
+                   theme: Theme | None = None):
+    """Signed statistic by category: colour = effect, size = significance.
+
+    Rows are `value_df.index`, columns are its columns, and `size_df` — same
+    shape, same labels — holds the q-values. Both encodings are needed and
+    neither substitutes for the other: colour without size shows a strong
+    effect that might be noise, size without colour shows a confident result
+    without saying which way it went.
+
+    The colour scale is symmetric about zero and the cmap is expected to be
+    diverging, because the quantity is signed and the midpoint has to mean "no
+    effect". An asymmetric ramp on signed data puts the neutral colour at some
+    arbitrary non-zero value, and every reader takes it for zero anyway.
+
+    Significance is `-log10(q)` clipped at `FDR_FLOOR` — see the constant.
+    Returns `(colorbar, handles)`, where `handles` is the size key. It is
+    returned rather than drawn because these panels usually already carry a
+    `group_strip`, and one legend below a panel reads better than a second
+    competing for a corner; pass it straight through as `extra_handles`.
+
+    rule_after : draw a separator after this many rows, for a block of rows
+      that met some criterion the rest did not.
+    rule_label : what the rule means. Returned as a legend handle, not drawn
+      above the axes — a sentence over the plot is a title, and this paper's
+      panels do not carry one. Ignored unless `rule_after` is set.
+    """
+    from matplotlib.colors import Normalize
+    from matplotlib.lines import Line2D
+
+    t = resolve(theme)
+    value_df = pd.DataFrame(value_df)
+    rows, cols = list(value_df.index), list(value_df.columns)
+    if size_df is not None:
+        size_df = pd.DataFrame(size_df)
+        if list(size_df.index) != rows or list(size_df.columns) != cols:
+            raise ValueError("dotplot_matrix: size_df must share index and "
+                             "columns with value_df")
+
+    cmap = cmap if cmap is not None else diverging_cmap(t.down, t.up,
+                                                        name="matrix_div")
+    vals = value_df.values.astype(float)
+    lim = float(np.nanmax(np.abs(vals))) if np.isfinite(vals).any() else 1.0
+    norm = Normalize(vmin=-lim, vmax=lim if lim > 0 else 1.0)
+
+    s0, s1 = float(size_range[0]), float(size_range[1])
+    span = -np.log10(FDR_FLOOR)
+
+    def _size(q):
+        if not np.isfinite(q):
+            return s0
+        nlq = -np.log10(min(max(float(q), FDR_FLOOR), 1.0))
+        return s0 + (s1 - s0) * (nlq / span)
+
+    xs, ys, ss, cs = [], [], [], []
+    for i in range(len(rows)):
+        for j in range(len(cols)):
+            v = vals[i, j]
+            if not np.isfinite(v):
+                continue
+            xs.append(j); ys.append(i); cs.append(v)
+            ss.append(_size(size_df.values[i, j]) if size_df is not None else s1)
+    sc = ax.scatter(xs, ys, s=ss, c=cs, cmap=cmap, norm=norm,
+                    edgecolors="#333", linewidths=0.3, zorder=3)
+
+    ax.set_yticks(range(len(rows)))
+    ax.set_yticklabels(rows, fontsize=9 if label_size is None else label_size)
+    ax.set_xticks(range(len(cols)))
+    ax.set_xticklabels(cols, rotation=col_rotation,
+                       fontsize=8 if label_size is None else label_size,
+                       ha="right" if col_rotation else "center")
+    ax.tick_params(length=0)
+    ax.set_xlim(-0.6, len(cols) - 0.4)
+    ax.set_ylim(-0.6, len(rows) - 0.4)
+    ax.invert_yaxis()
+    # Horizontal only: the rows are what a reader tracks across, and a vertical
+    # line through a categorical axis separates nothing.
+    ax.grid(visible=True, axis="y")
+    ax.grid(visible=False, axis="x")
+
+    rule_handle = None
+    if rule_after is not None:
+        ax.axhline(rule_after - 0.5, color="#333", linewidth=0.8, zorder=4)
+        if rule_label:
+            rule_handle = Line2D([0], [0], color="#333", linewidth=0.8,
+                                 label=rule_label)
+
+    import matplotlib.pyplot as plt
+    cb = plt.colorbar(sc, ax=ax, fraction=0.025, pad=0.02)
+    cb.ax.tick_params(labelsize=8)
+    if cbar_label:
+        cb.set_label(cbar_label, fontsize=9)
+
+    refs = [1.0, 0.05, FDR_FLOOR]
+    handles = [Line2D([0], [0], marker="o", color="w", markerfacecolor="#CCCCCC",
+                      markeredgecolor="black", markeredgewidth=0.3,
+                      markersize=float(np.sqrt(_size(q))),
+                      label=(f"FDR ≤{q:g}" if q <= FDR_FLOOR else f"FDR {q:g}"))
+               for q in refs] if size_df is not None else []
+    if rule_handle is not None:
+        handles.append(rule_handle)
+
+    despine(ax, "all")
+    return cb, handles
