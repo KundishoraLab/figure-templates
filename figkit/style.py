@@ -96,3 +96,59 @@ def size_legend(ax, values, size_fn, label_fn=str, title: str = "",
     return ax.legend(handles=handles, loc=loc, frameon=False, fontsize=8,
                      labelspacing=0.7, handletextpad=0.5, title=title,
                      title_fontsize=9)
+
+
+def group_strip(ax, counts, palette=None, legend_cols: int = 3,
+                extra_handles=None, y: float = -0.02, height: float = 0.022,
+                gap: float = 0.004, legend_y: float = -0.34,
+                fontsize: float = 8, theme: Theme | None = None):
+    """Annotate contiguous runs of the x axis with a colour bar and a key.
+
+    `counts` is an ordered {group: n_categories} mapping over the x axis, read
+    left to right: the first group takes the first n ticks, the next the next,
+    and so on. Nothing is inferred from the tick labels, because a gene can
+    belong to two modules and the caller is the only one who knows which run it
+    was drawn in.
+
+    This exists instead of text over the plot. Labelling groups in the data area
+    puts ink where the reader is measuring, and it collides as soon as a
+    category is tall; a strip under the axis is out of the way and stays
+    readable at any data range. Group order must match the plotting order or
+    the strip is silently wrong — the strip cannot detect that, so keep the same
+    ordered mapping that built the x axis.
+
+    `extra_handles` are appended to the key, for the case where the panel also
+    size- or shade-encodes something: one legend below a panel reads better than
+    two competing for its corners. Everything is in axes coordinates so the
+    strip tracks the axes through `tight_layout`, and the caller reserves room
+    with `fig.tight_layout(rect=...)`.
+
+    Replaces any existing legend on `ax`. If the panel already had one, keep the
+    handle and `ax.add_artist(it)` afterwards.
+    """
+    import matplotlib.patches as mpatches
+
+    t = resolve(theme)
+    pal = palette if palette is not None else {
+        g: t.categorical[i % len(t.categorical)] for i, g in enumerate(counts)
+    }
+
+    start = 0
+    n_total = sum(counts.values())
+    for g, n in counts.items():
+        if n <= 0:
+            continue
+        x0, x1 = start / n_total, (start + n) / n_total
+        ax.add_patch(mpatches.Rectangle(
+            (x0, y - height), max(x1 - x0 - gap, 0.0), height,
+            transform=ax.transAxes, clip_on=False, linewidth=0,
+            facecolor=pal[g], zorder=5))
+        start += n
+
+    handles = [mpatches.Patch(facecolor=pal[g], edgecolor="none", label=g)
+               for g, n in counts.items() if n > 0]
+    handles += list(extra_handles or [])
+    return ax.legend(handles=handles, loc="upper center",
+                     bbox_to_anchor=(0.5, legend_y), ncol=legend_cols,
+                     frameon=False, fontsize=fontsize, handlelength=1.1,
+                     handletextpad=0.5, columnspacing=1.4, borderaxespad=0)

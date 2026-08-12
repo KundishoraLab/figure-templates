@@ -23,14 +23,14 @@ from .palettes import (
     categorical_palette, diverging_cmap, gradient_cmap, quantile_norm,
     sequential_cmap,
 )
-from .style import apply_rcparams, despine, save_panel, size_legend
+from .style import apply_rcparams, despine, group_strip, save_panel, size_legend
 from .theme import BASE_THEME, Theme, get_theme, set_theme
 
 __version__ = "0.1.0"
 
 __all__ = [
     "Theme", "BASE_THEME", "set_theme", "get_theme",
-    "apply_rcparams", "save_panel", "despine", "size_legend",
+    "apply_rcparams", "save_panel", "despine", "size_legend", "group_strip",
     "KELLY", "WONG", "NA_COLOR", "YLGNBU3", "NAVY_YELLOW", "PUOR_DIV",
     "diverging_cmap", "sequential_cmap", "gradient_cmap", "quantile_norm",
     "categorical_palette",
