@@ -13,7 +13,8 @@ def heatmap(df, ax, cmap=None, vmin=None, vmax=None, symmetric: bool = False,
             row_label_size: float = 9, col_label_size: float = 9,
             col_label_rotation: float = 90, na_color: str | None = None,
             annotate: bool = False, annot_fmt: str = "{:.2f}",
-            annot_size: float = 7, theme: Theme | None = None):
+            annot_size: float = 7, cell_border: str | None = None,
+            cell_border_width: float = 0.6, theme: Theme | None = None):
     """ComplexHeatmap-style heatmap from a rows x columns DataFrame.
 
     NaN cells render in `na_color` (grey by default) rather than as a
@@ -25,6 +26,12 @@ def heatmap(df, ax, cmap=None, vmin=None, vmax=None, symmetric: bool = False,
 
     col_label_rotation=0 is the right call for a single- or few-column
     heatmap, where vertical labels are just harder to read.
+
+    `cell_border` draws a line between adjacent cells — "white" is the usual
+    choice and is what separates a block of similar values into countable
+    cells instead of one wash. It is off by default because it costs ink that
+    a large grid cannot afford: on anything past roughly 40x40 the borders
+    start eating the cells they are meant to delimit.
     """
     t = resolve(theme)
     df = pd.DataFrame(df)
@@ -42,6 +49,17 @@ def heatmap(df, ax, cmap=None, vmin=None, vmax=None, symmetric: bool = False,
     im = ax.imshow(np.ma.masked_invalid(arr), cmap=cmap, vmin=vmin, vmax=vmax,
                    aspect="auto", interpolation="none",
                    rasterized=arr.size > 5000)
+
+    if cell_border is not None:
+        # Minor ticks on the cell boundaries, and the grid drawn on those. The
+        # alternative -- a Rectangle per cell -- puts thousands of artists in
+        # the figure and doubles the file, for a line imshow can already draw.
+        ax.set_xticks(np.arange(-0.5, df.shape[1], 1), minor=True)
+        ax.set_yticks(np.arange(-0.5, df.shape[0], 1), minor=True)
+        ax.grid(which="minor", color=cell_border, linestyle="-",
+                linewidth=cell_border_width)
+        ax.tick_params(which="minor", length=0)
+        ax.set_axisbelow(False)
 
     ax.set_xticks(np.arange(df.shape[1]))
     ha = "right" if col_label_rotation not in (0, 360) else "center"
