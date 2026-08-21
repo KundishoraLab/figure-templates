@@ -48,12 +48,29 @@ def lollipop(df, ax, label_col: str = "source", value_col: str = "delta",
         lo, hi = float(nlq.min()), float(nlq.max())
         s0, s1 = size_range
 
+        # Clamped, and the degenerate range answered explicitly rather than
+        # by a floored denominator. `max(hi - lo, 1e-9)` looks like a
+        # divide-by-zero guard and is not one: when every q is equal it turns
+        # a range of zero into a slope of 1e9, so any value off the observed
+        # range extrapolates to an absurd area. `size_legend` calls this
+        # function at `q_sig`, which is off the range exactly when nothing is
+        # significant -- a panel where every q was 1.0 asked for the area at
+        # q = 0.05 and got 1.2e11 pt^2, a marker 342,000 pt across. The PDF
+        # backend writes that as coordinates and the page looks normal; Agg
+        # tries to rasterise it and the process is killed with no traceback,
+        # so the failure reads as a crash rather than as a plotting bug.
+        # Clamping also fixes the non-degenerate case, where the key could
+        # otherwise show an area larger than any mark on the panel.
+        flat = (hi - lo) < 1e-9
+
         def _size(v):
-            return s0 + (s1 - s0) * (v - lo) / max(hi - lo, 1e-9)
+            if flat:
+                return s0
+            return s0 + (s1 - s0) * (min(max(v, lo), hi) - lo) / (hi - lo)
         sizes = [_size(v) for v in nlq]
     else:
         sizes = [size_range[1] * 0.5] * len(d)
-        _size = None
+        _size, flat = None, True
 
     vals = d[value_col].values
     stem_lo = np.zeros(len(d))
@@ -104,7 +121,9 @@ def lollipop(df, ax, label_col: str = "source", value_col: str = "delta",
         for lbl, v in zip(tick_labels, vals):
             lbl.set_color(up_c if v > 0 else dn_c)
 
-    if show_size_legend and _size is not None and len(d) > 1:
+    # No key when every mark is the same size: it would key an area to a
+    # value the panel does not distinguish.
+    if show_size_legend and _size is not None and len(d) > 1 and not flat:
         qs = pd.to_numeric(d[q_col], errors="coerce").fillna(1.0)
         refs = sorted({q_sig, float(qs.median()), float(qs.min())})
         refs = [q for q in refs if q > 0]
