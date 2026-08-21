@@ -138,7 +138,13 @@ def lollipop(df, ax, label_col: str = "source", value_col: str = "delta",
             size_legend(ax, refs,
                         lambda q: _size(-np.log10(max(q, 1e-300))),
                         label_fn=lambda q: (f"q={q:.0e}" if q < 0.01 else f"q={q:g}"),
-                        title="", loc="upper right")
+                        # "best", not "upper right". The star strip sits at the
+                        # top of the data range, so a significant mark near the
+                        # right edge lands under a corner-anchored key and the
+                        # star that carries the panel's verdict is drawn through
+                        # its own label. Let matplotlib place the key where the
+                        # artists are not.
+                        title="", loc="best")
     despine(ax)
     return {"n_shown": len(d), "n_up": int((vals > 0).sum()),
             "n_down": int((vals < 0).sum())}
