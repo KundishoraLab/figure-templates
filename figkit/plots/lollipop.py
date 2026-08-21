@@ -126,7 +126,14 @@ def lollipop(df, ax, label_col: str = "source", value_col: str = "delta",
     if show_size_legend and _size is not None and len(d) > 1 and not flat:
         qs = pd.to_numeric(d[q_col], errors="coerce").fillna(1.0)
         refs = sorted({q_sig, float(qs.median()), float(qs.min())})
-        refs = [q for q in refs if q > 0]
+        # Only reference values the panel actually spans. `q_sig` is a useful
+        # anchor when some mark is near it and a lie when none is: with the
+        # sizes clamped, a `q_sig` below every observed q keys at the same area
+        # as the smallest observed q, so the key shows two different numbers
+        # drawn at one size. Dropping it says "nothing here is near 0.05" by
+        # omission, which is the truth the panel is carrying anyway.
+        refs = [q for q in refs
+                if q > 0 and float(qs.min()) <= q <= float(qs.max())]
         if refs:
             size_legend(ax, refs,
                         lambda q: _size(-np.log10(max(q, 1e-300))),
