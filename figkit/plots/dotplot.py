@@ -31,7 +31,7 @@ def dotplot_pathway(df, ax, pathway_col: str = "pathway", nes_col: str = "NES",
                     up_color: str | None = None, down_color: str | None = None,
                     size_range=(30, 110), show_size_legend: bool = True,
                     x_label: str = "NES", cbar_label: str | None = None,
-                    prettify: bool = True):
+                    size_label: str = "FDR", prettify: bool = True):
     """Pathway enrichment dotplot: y = pathway, x = NES, size = -log10(padj),
     color = NES.
 
@@ -45,6 +45,12 @@ def dotplot_pathway(df, ax, pathway_col: str = "pathway", nes_col: str = "NES",
         |NES|; 'signed' keeps the most positive and most negative (top_n/2
         each), which is the honest choice when you want to show both
         directions rather than whichever one happens to dominate.
+    size_label : what the size key calls the quantity in `padj_col`. Defaults
+        to "FDR", which is what the parameter name promises and what every
+        caller has passed; it is a parameter rather than a constant because
+        the key used to say FDR over whatever arrived, and a panel drawn from
+        an unadjusted p had no way to say so. See `dotplot_matrix` for the
+        case that made this necessary.
     """
     t = resolve(theme)
     up_c, dn_c = up_color or t.up, down_color or t.down
@@ -101,7 +107,7 @@ def dotplot_pathway(df, ax, pathway_col: str = "pathway", nes_col: str = "NES",
         if refs:
             size_legend(ax, sorted(set(refs)), _size,
                         label_fn=lambda v: f"{10 ** (-v):.1e}",
-                        title="FDR", loc="lower right")
+                        title=size_label, loc="lower right")
     despine(ax)
     return {"n_shown": len(d)}
 
@@ -348,7 +354,7 @@ def dotplot_matrix(value_df, ax, size_df=None, cmap=None,
                    size_range=(18.0, 98.0), col_rotation: int = 45,
                    rule_after: int | None = None, rule_label: str | None = None,
                    cbar_label: str | None = None, label_size: float | None = None,
-                   theme: Theme | None = None):
+                   size_label: str = "FDR", theme: Theme | None = None):
     """Signed statistic by category: colour = effect, size = significance.
 
     Rows are `value_df.index`, columns are its columns, and `size_df` — same
@@ -361,6 +367,18 @@ def dotplot_matrix(value_df, ax, size_df=None, cmap=None,
     diverging, because the quantity is signed and the midpoint has to mean "no
     effect". An asymmetric ramp on signed data puts the neutral colour at some
     arbitrary non-zero value, and every reader takes it for zero anyway.
+
+    **`size_label` is a claim, and this function cannot check it.** The size
+    key read "FDR" whatever arrived in `size_df`, which is a statement about
+    someone else's arithmetic printed on their behalf. It happened: a caller
+    wrote an *unadjusted* p to a file named `progeny_padj` and passed it here,
+    and the panel said FDR three times over — in the filename, in the column
+    name, and in this key — with no correction anywhere behind it. This
+    parameter does not catch that and nothing here can; what it does is make
+    the true label sayable, so a panel drawn from a nominal p can say so
+    instead of being forced to lie. The default stays "FDR" because every
+    existing caller passes one and a changed default would silently relabel
+    their panels. If your `size_df` is not adjusted, pass what it is.
 
     Significance is `-log10(q)` clipped at `FDR_FLOOR` — see the constant.
     Returns `(colorbar, handles)`, where `handles` is the size key. It is
@@ -444,7 +462,8 @@ def dotplot_matrix(value_df, ax, size_df=None, cmap=None,
     handles = [Line2D([0], [0], marker="o", color="w", markerfacecolor="#CCCCCC",
                       markeredgecolor="black", markeredgewidth=0.3,
                       markersize=float(np.sqrt(_size(q))),
-                      label=(f"FDR ≤{q:g}" if q <= FDR_FLOOR else f"FDR {q:g}"))
+                      label=(f"{size_label} ≤{q:g}" if q <= FDR_FLOOR
+                             else f"{size_label} {q:g}"))
                for q in refs] if size_df is not None else []
     if rule_handle is not None:
         handles.append(rule_handle)
