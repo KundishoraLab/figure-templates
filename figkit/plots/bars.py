@@ -56,19 +56,19 @@ def stacked_bar(df, ax, palette=None, order=None, normalize: bool = True,
                     if orient != "h":
                         cx, cy = cy, cx
                     ax.text(cx, cy, label_fmt.format(pct), ha="center",
-                            va="center", fontsize=7, color="white")
+                            va="center", fontsize=t.base_size, color="white")
         offset = offset + vals
 
     default_x = "fraction" if normalize else "count"
     if orient == "h":
-        ax.set_yticks(pos); ax.set_yticklabels(d.index, fontsize=11)
+        ax.set_yticks(pos); ax.set_yticklabels(d.index, fontsize=t.base_size)
         ax.set_xlabel(x_label if x_label is not None else default_x)
         ax.set_ylabel(y_label)
         if normalize:
             ax.set_xlim(0, 1)
     else:
         ax.set_xticks(pos)
-        ax.set_xticklabels(d.index, fontsize=11, rotation=45, ha="right")
+        ax.set_xticklabels(d.index, fontsize=t.base_size, rotation=45, ha="right")
         ax.set_ylabel(x_label if x_label is not None else default_x)
         ax.set_xlabel(y_label)
         if normalize:
@@ -76,7 +76,7 @@ def stacked_bar(df, ax, palette=None, order=None, normalize: bool = True,
 
     if legend:
         ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False,
-                  fontsize=9, title=legend_title,
+                  fontsize=t.base_size, title=legend_title,
                   ncol=1 if d.shape[1] <= 12 else 2)
     despine(ax)
     return {"n_groups": len(d), "n_categories": d.shape[1]}
@@ -126,7 +126,7 @@ def ordered_bar(df, ax, value_col: str, label_col: str = None, order=None,
     if orient == "h":
         ax.barh(pos, vals, color=colors, edgecolor="white", linewidth=0.3,
                 height=bar_width)
-        ax.set_yticks(pos); ax.set_yticklabels(d["_label"].astype(str), fontsize=9)
+        ax.set_yticks(pos); ax.set_yticklabels(d["_label"].astype(str), fontsize=t.base_size)
         ax.set_xlabel(x_label)
         ax.invert_yaxis()  # first entry of `order` on top
     else:
@@ -134,7 +134,7 @@ def ordered_bar(df, ax, value_col: str, label_col: str = None, order=None,
                width=bar_width)
         ax.set_xticks(pos)
         ax.set_xticklabels(d["_label"].astype(str), rotation=45, ha="right",
-                           fontsize=9)
+                           fontsize=t.base_size)
         ax.set_ylabel(x_label)
 
     despine(ax)
