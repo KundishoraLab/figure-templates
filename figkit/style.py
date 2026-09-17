@@ -46,11 +46,14 @@ def apply_rcparams(theme: Theme | None = None, grid: bool = False) -> None:
 
 
 def save_panel(fig, name: str, outdir, formats=("png", "svg"),
-               dpi: int | None = None, close: bool = True) -> list[Path]:
+               dpi: int | None = None, close: bool = True,
+               bbox_inches: str | None = "tight") -> list[Path]:
     """Write `fig` to outdir/<name>.<ext> for each format. Returns the paths.
 
     PNG for looking at, SVG (or PDF) for the composite — ship both so the
     figure assembler never has to re-run the producer to get a vector copy.
+    `bbox_inches=None` keeps the figure at its declared size (a panel drawn AT its
+    composite slot size must not be re-cropped); "tight" trims to content.
     """
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -61,7 +64,7 @@ def save_panel(fig, name: str, outdir, formats=("png", "svg"),
     written = []
     for ext in formats:
         p = outdir / f"{name}.{ext}"
-        fig.savefig(p, dpi=dpi, bbox_inches="tight")
+        fig.savefig(p, dpi=dpi, bbox_inches=bbox_inches)
         written.append(p)
     if close:
         plt.close(fig)
