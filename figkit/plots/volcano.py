@@ -55,7 +55,8 @@ def volcano(df, ax, x_col: str = "log2fc", y_col: str = "pvalue",
             jitter: bool = True,
             theme: Theme | None = None,
             up_color: str | None = None, down_color: str | None = None,
-            x_label: str | None = None, y_label: str | None = None):
+            x_label: str | None = None, y_label: str | None = None,
+            label_size: float | None = None):
     """Volcano: x = effect size, y = -log10(p), colored by direction.
 
     Design decisions worth keeping (each fixes a real failure mode):
@@ -157,13 +158,15 @@ def volcano(df, ax, x_col: str = "log2fc", y_col: str = "pvalue",
         to_label = []
 
     stars = set(map(str, star_set)) if star_set else set()
+    # type follows the theme: gene labels at 0.8 × base (7.2 pt at the 9-pt house base), axis titles at base
+    lab_pt = label_size if label_size is not None else t.base_size * 0.8
     texts = []
     for frame, color in to_label:
         for _, r in frame.iterrows():
             name = str(r[label_col])
             texts.append(ax.text(r[x_col], r["_nlp"],
                                  f"{name}*" if name in stars else name,
-                                 fontsize=8, color=color, fontweight="medium"))
+                                 fontsize=lab_pt, color=color, fontweight="medium"))
 
     ax.axhline(-np.log10(p_thresh), color="#888", lw=0.4, ls=":")
     ax.axvline(lfc_thresh, color="#888", lw=0.4, ls=":")
@@ -177,8 +180,8 @@ def volcano(df, ax, x_col: str = "log2fc", y_col: str = "pvalue",
     xl = x_label if x_label is not None else "log2 fold change"
     if lfc_cap is not None and x_label is None:
         xl += f" (capped at ±{lfc_cap:g})"
-    ax.set_xlabel(xl, fontsize=11)
-    ax.set_ylabel(y_label if y_label is not None else "−log10 p", fontsize=11)
+    ax.set_xlabel(xl, fontsize=t.base_size)
+    ax.set_ylabel(y_label if y_label is not None else "−log10 p", fontsize=t.base_size)
 
     # Run last: adjustText needs the final coordinate space.
     if texts:
