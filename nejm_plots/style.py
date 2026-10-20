@@ -48,6 +48,8 @@ def use_nejm_style(base_size: float = 10):
     mpl.rcParams.update({
         "font.family": "sans-serif",
         "font.sans-serif": [font] + FONT_STACK,
+        "svg.fonttype": "none",       # text stays text: editable vectors (NEJM), measurable type
+        "pdf.fonttype": 42,           # TrueType embedded, editable in Illustrator
         "font.size": base_size,
         "mathtext.fontset": "custom",
         "mathtext.rm": font,
