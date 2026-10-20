@@ -232,3 +232,11 @@ deliberate changes:
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## nejm_plots: NEJM-style panels and composites (added 2026-10-20)
+
+A second package in this repo, `nejm_plots/`, is the NEJM figure kit: a `Theme` (presets `paper`, `nature`, `nejm`), fifteen
+panel makers (`nejm_plots.panels`: km, forest, groups, paired, volcano, correlation, trajectory, point_range, grotta,
+timecourse, violin, bar_points, flow, legend, `custom_panel` for any draw function) and a 12-column `Composite` at journal
+widths. Its own guide is `nejm_plots/README.md`; demos in `demo/nejm/`, renders in `gallery/nejm/`. Install this repo editable
+(`python -m pip install -e .`) and `import nejm_plots`. It depends on numpy, scipy and matplotlib only.
