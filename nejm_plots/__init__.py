@@ -44,5 +44,5 @@ from .flow import add_gate, flow_axes, plot_flow
 from .assembly import WIDTHS, Composite, Panel, Region, Theme, get_theme
 from .panels import *  # noqa: F401,F403  (figure makers)
 from .diagram import Canvas, Item, Node, Para, TextBlock, box_height, text_width, wrap
-from .consort import Consort, ConsortStyle, Exit
+from .consort import Consort, ConsortStyle, Exit, SourceGroup
 from .schema import Band, Bracket, Event, RunIn, SchemaStyle, TrialSchema

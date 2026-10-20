@@ -48,6 +48,15 @@ class Exit:
 
 
 @dataclass
+class SourceGroup:
+    """Source cohorts that share one intermediate stage (e.g. three sites genotyped together):
+    boxes in the top row, then a bar merging them into `stage`, which then merges with the
+    other groups into the trunk. stage=None: the boxes merge straight into the trunk."""
+    boxes: Sequence[str]
+    stage: str | None = None
+
+
+@dataclass
 class ConsortStyle:
     size: float = 7.2
     edge: str = "#4D4D4D"
@@ -95,18 +104,55 @@ class Consort:
         prev = None
         merge_y = None
         if self.sources:
-            k = len(self.sources)
+            groups = [g if isinstance(g, SourceGroup) else SourceGroup([g]) for g in self.sources]
+            flat = [b for g in groups for b in g.boxes]
+            k = len(flat)
             gap = st.source_gap * W
             w = (W - gap * (k - 1)) / k
-            blocks = [self._block(sx, w, True) for sx in self.sources]
+            blocks = [self._block(sx, w, True) for sx in flat]
             h = max(max(b.height + 2 * st.pad_y for b in blocks), st.min_h)
             nodes = [Node(i * (w + gap), 0.0, w, h) for i in range(k)]
             for n, b in zip(nodes, blocks):
                 ops.append(("box", (n, b)))
-            merge_y = h + st.source_drop
-            for n in nodes:
-                ops.append(("line", [(n.cx, n.bottom), (n.cx, merge_y)]))
-            ops.append(("line", [(nodes[0].cx, merge_y), (nodes[-1].cx, merge_y)]))
+            bar1 = h + st.source_drop
+            feeds = []                                   # (cx, y) of what merges into the trunk
+            i = 0
+            stage_nodes = []
+            for g in groups:
+                gn = nodes[i:i + len(g.boxes)]
+                i += len(g.boxes)
+                gx = (gn[0].cx + gn[-1].cx) / 2
+                if g.stage is None:
+                    feeds += [(n.cx, n.bottom) for n in gn]
+                    continue
+                for n in gn:
+                    ops.append(("line", [(n.cx, n.bottom), (n.cx, bar1)]))
+                if len(gn) > 1:
+                    ops.append(("line", [(gn[0].cx, bar1), (gn[-1].cx, bar1)]))
+                span = gn[-1].right - gn[0].left
+                sw = min(max(st.arm_w * W, 0.55 * span), 0.45 * W)
+                b = self._block(g.stage, sw, True)
+                left = min(max(gx - sw / 2, 0.0), W - sw)          # inside the panel
+                sn = Node(left, bar1 + st.source_rise, sw, max(b.height + 2 * st.pad_y, st.min_h))
+                stage_nodes.append((sn, b))
+            if stage_nodes:
+                hs = max(sn.h for sn, _ in stage_nodes)
+                for sn, b in stage_nodes:
+                    sn = Node(sn.left, sn.top + (hs - sn.h) / 2, sn.w, sn.h)
+                    ops.append(("box", (sn, b)))
+                    ops.append(("arrow", [(sn.cx, bar1), (sn.cx, sn.top)]))
+                    if abs(sn.cx - gx) > 1e-6:                      # the box was shifted inside
+                        ops.append(("line", [(min(gx, sn.cx), bar1), (max(gx, sn.cx), bar1)]))
+                    feeds.append((sn.cx, sn.bottom))
+                bottom = max(sn.top + sn.h for sn, _ in stage_nodes)
+            else:
+                bottom = h
+            merge_y = bottom + st.source_drop
+            for cx, yb in feeds:
+                ops.append(("line", [(cx, yb), (cx, merge_y)]))
+            xs = sorted(cx for cx, _ in feeds)
+            if len(xs) > 1:
+                ops.append(("line", [(xs[0], merge_y), (xs[-1], merge_y)]))
             y = merge_y + st.source_rise
         for it in self.pre:
             if it is None:
