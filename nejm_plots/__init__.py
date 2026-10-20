@@ -28,7 +28,7 @@ a new figure layout:
 from .style import (COLORS, MRS_COLORS, InchLayout, add_y_break, auto_y_break, clean_axes,
                     log10_axis, sci_times_labels, use_nejm_style)
 from .km import (KMArm, KMFit, add_at_risk_table, add_km_annotation, add_km_pvalue,
-                 format_p, kaplan_meier, label_curves, logrank_test, plot_km)
+                 format_p, kaplan_meier, label_curves, logrank_test, median_survival, plot_km)
 from .forest import ForestRow, plot_forest
 from .grotta import mrs_legend, plot_grotta
 from .estimates import (add_difference_bracket, band_legend, dot_legend, plot_point_range,

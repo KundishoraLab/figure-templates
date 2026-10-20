@@ -47,8 +47,9 @@ class KMFit:
         return self.s[np.clip(idx, 0, None)]
 
 
-def kaplan_meier(time, event, conf=0.95, label="") -> KMFit:
-    """Product-limit estimate with Greenwood variance and log(-log) confidence limits."""
+def kaplan_meier(time, event, conf=0.95, label="", conf_type="loglog") -> KMFit:
+    """Product-limit estimate with Greenwood variance; confidence limits on the log(-log)
+    scale (default) or the log scale (conf_type="log", survfit's default)."""
     time = np.asarray(time, float)
     event = np.asarray(event).astype(int)
     z = stats.norm.ppf(0.5 + conf / 2)
@@ -61,8 +62,11 @@ def kaplan_meier(time, event, conf=0.95, label="") -> KMFit:
         s *= 1 - d / n
         gw = gw + d / (n * (n - d)) if n > d else np.inf
         if 0 < s < 1 and np.isfinite(gw):
-            se = np.sqrt(gw) / abs(np.log(s))
-            lo, hi = s ** np.exp(z * se), s ** np.exp(-z * se)
+            if conf_type == "log":
+                lo, hi = s * np.exp(-z * np.sqrt(gw)), min(1.0, s * np.exp(z * np.sqrt(gw)))
+            else:
+                se = np.sqrt(gw) / abs(np.log(s))
+                lo, hi = s ** np.exp(z * se), s ** np.exp(-z * se)
         elif s <= 0:
             lo = hi = 0.0
         else:
@@ -98,6 +102,23 @@ def logrank_test(fits: Sequence[KMFit]):
         V += c * (np.diag(n_g) * n - np.outer(n_g, n_g))
     chi2 = float(U[:-1] @ np.linalg.pinv(V[:-1, :-1]) @ U[:-1])
     return chi2, float(stats.chi2.sf(chi2, k - 1))
+
+
+def median_survival(fit: KMFit):
+    """Median and its 95% CI as survfit reports them: the first time the curve reaches 0.5
+    (if it sits exactly at 0.5, the midpoint of that flat step); the bounds are where the
+    lower and upper confidence curves reach 0.5; nan when a curve never does."""
+    def first_at_or_below(curve):
+        idx = np.where(curve <= 0.5 + 1e-12)[0]
+        if not len(idx):
+            return float("nan")
+        i = idx[0]
+        if abs(curve[i] - 0.5) < 1e-12:                   # flat at 0.5: midpoint to the next drop
+            j = np.where(curve[i + 1:] < 0.5 - 1e-12)[0]
+            if len(j):
+                return float((fit.t[i] + fit.t[i + 1 + j[0]]) / 2)
+        return float(fit.t[i])
+    return first_at_or_below(fit.s), first_at_or_below(fit.lo), first_at_or_below(fit.hi)
 
 
 def format_p(p):
