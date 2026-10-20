@@ -130,10 +130,9 @@ class Consort:
                 if len(gn) > 1:
                     ops.append(("line", [(gn[0].cx, bar1), (gn[-1].cx, bar1)]))
                 span = gn[-1].right - gn[0].left
-                sw = min(max(st.arm_w * W, 0.55 * span), 0.45 * W)
+                sw = min(max(st.arm_w * W, 0.55 * span), 0.45 * W, 2 * gx, 2 * (W - gx))  # centred, inside
                 b = self._block(g.stage, sw, True)
-                left = min(max(gx - sw / 2, 0.0), W - sw)          # inside the panel
-                sn = Node(left, bar1 + st.source_rise, sw, max(b.height + 2 * st.pad_y, st.min_h))
+                sn = Node(gx - sw / 2, bar1 + st.source_rise, sw, max(b.height + 2 * st.pad_y, st.min_h))
                 stage_nodes.append((sn, b))
             if stage_nodes:
                 hs = max(sn.h for sn, _ in stage_nodes)
@@ -141,8 +140,6 @@ class Consort:
                     sn = Node(sn.left, sn.top + (hs - sn.h) / 2, sn.w, sn.h)
                     ops.append(("box", (sn, b)))
                     ops.append(("arrow", [(sn.cx, bar1), (sn.cx, sn.top)]))
-                    if abs(sn.cx - gx) > 1e-6:                      # the box was shifted inside
-                        ops.append(("line", [(min(gx, sn.cx), bar1), (max(gx, sn.cx), bar1)]))
                     feeds.append((sn.cx, sn.bottom))
                 bottom = max(sn.top + sn.h for sn, _ in stage_nodes)
             else:
