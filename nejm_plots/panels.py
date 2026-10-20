@@ -33,11 +33,12 @@ from .scatter import plot_correlation, plot_roc, plot_volcano
 from .timecourse import (plot_bar_points, plot_time_line, plot_time_strip, plot_violin_outline,
                          segment_positions, segmented_time_axis)
 from .flow import add_gate, plot_flow
+from .flowchart import FlowNode, plot_flowchart
 
 __all__ = ["custom_panel", "km_panel", "roc_panel", "groups_panel", "paired_panel",
            "volcano_panel", "correlation_panel", "trajectory_panel", "forest_panel",
            "grotta_panel", "point_range_panel", "timecourse_panel", "violin_panel",
-           "bar_points_panel", "flow_panel", "legend_panel"]
+           "bar_points_panel", "flow_panel", "legend_panel", "flowchart_panel"]
 
 
 def _common(kw):
@@ -482,3 +483,18 @@ def legend_panel(items: Sequence[tuple], *, title=None, ncol=1, loc="center left
                   alignment="left", frameon=False)
     base = {"left!": 0.05, "right!": 0.05}
     return Panel(draw, {**base, **(margins or {})}, None, None, label)
+
+
+def flowchart_panel(nodes, edges, *, margins=None, aspect=None, **kw):
+    """CONSORT-style flow: FlowNode positions are fractions of the axes box, so the panel
+    fills whatever cell it lands in; set aspect (height / width) to fix its shape."""
+    common = _common(kw)
+    m = _merge(lambda t: {"left!": 0.02, "right!": 0.02, "bottom!": 0.02}, margins)
+
+    def draw(region):
+        ax = region.axes()
+        _, _, w, h = region.box
+        plot_flowchart(ax, nodes, edges, w, h, **kw)
+        return ax
+
+    return Panel(draw, margins=m, aspect=aspect, no_axes_frame=True, **common)

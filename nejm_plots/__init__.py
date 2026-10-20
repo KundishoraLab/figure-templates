@@ -16,6 +16,7 @@ a new figure layout:
     timecourse segment_positions, segmented_time_axis, plot_time_strip, plot_time_line,
                summarize, geo_summary, plot_violin_outline, plot_bar_points, bracket
     flow       plot_flow, flow_axes, add_gate
+    flowchart  FlowNode, plot_flowchart (CONSORT-style boxes and arrows)
     assembly   Theme, Composite, Panel, Region, get_theme, WIDTHS
     panels     km_panel, roc_panel, groups_panel, paired_panel, volcano_panel,
                correlation_panel, trajectory_panel, forest_panel, grotta_panel,
@@ -38,5 +39,6 @@ from .timecourse import (bracket, geo_summary, plot_bar_points, plot_time_line,
                          plot_time_strip, plot_violin_outline, segment_positions,
                          segmented_time_axis, summarize)
 from .flow import add_gate, flow_axes, plot_flow
+from .flowchart import FlowNode, plot_flowchart
 from .assembly import WIDTHS, Composite, Panel, Region, Theme, get_theme
 from .panels import *  # noqa: F401,F403  (figure makers)
