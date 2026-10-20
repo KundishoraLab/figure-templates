@@ -16,12 +16,14 @@ a new figure layout:
     timecourse segment_positions, segmented_time_axis, plot_time_strip, plot_time_line,
                summarize, geo_summary, plot_violin_outline, plot_bar_points, bracket
     flow       plot_flow, flow_axes, add_gate
-    flowchart  FlowNode, plot_flowchart (CONSORT-style boxes and arrows)
     assembly   Theme, Composite, Panel, Region, get_theme, WIDTHS
     panels     km_panel, roc_panel, groups_panel, paired_panel, volcano_panel,
                correlation_panel, trajectory_panel, forest_panel, grotta_panel,
                point_range_panel, timecourse_panel, violin_panel, bar_points_panel,
-               flow_panel, legend_panel, custom_panel
+               flow_panel, legend_panel, custom_panel, consort_panel, trial_schema_panel
+    diagram    Canvas, TextBlock, Para, Item, Node, text_width, wrap, box_height
+    consort    Consort, ConsortStyle, Exit
+    schema     TrialSchema, SchemaStyle, Band, Event, RunIn, Bracket
 """
 from .style import (COLORS, MRS_COLORS, InchLayout, add_y_break, auto_y_break, clean_axes,
                     log10_axis, sci_times_labels, use_nejm_style)
@@ -39,6 +41,8 @@ from .timecourse import (bracket, geo_summary, plot_bar_points, plot_time_line,
                          plot_time_strip, plot_violin_outline, segment_positions,
                          segmented_time_axis, summarize)
 from .flow import add_gate, flow_axes, plot_flow
-from .flowchart import FlowNode, plot_flowchart
 from .assembly import WIDTHS, Composite, Panel, Region, Theme, get_theme
 from .panels import *  # noqa: F401,F403  (figure makers)
+from .diagram import Canvas, Item, Node, Para, TextBlock, box_height, text_width, wrap
+from .consort import Consort, ConsortStyle, Exit
+from .schema import Band, Bracket, Event, RunIn, SchemaStyle, TrialSchema

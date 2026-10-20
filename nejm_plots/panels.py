@@ -33,12 +33,11 @@ from .scatter import plot_correlation, plot_roc, plot_volcano
 from .timecourse import (plot_bar_points, plot_time_line, plot_time_strip, plot_violin_outline,
                          segment_positions, segmented_time_axis)
 from .flow import add_gate, plot_flow
-from .flowchart import FlowNode, plot_flowchart
 
 __all__ = ["custom_panel", "km_panel", "roc_panel", "groups_panel", "paired_panel",
            "volcano_panel", "correlation_panel", "trajectory_panel", "forest_panel",
            "grotta_panel", "point_range_panel", "timecourse_panel", "violin_panel",
-           "bar_points_panel", "flow_panel", "legend_panel", "flowchart_panel"]
+           "bar_points_panel", "flow_panel", "legend_panel", "consort_panel", "trial_schema_panel"]
 
 
 def _common(kw):
@@ -485,16 +484,51 @@ def legend_panel(items: Sequence[tuple], *, title=None, ncol=1, loc="center left
     return Panel(draw, {**base, **(margins or {})}, None, None, label)
 
 
-def flowchart_panel(nodes, edges, *, margins=None, aspect=None, **kw):
-    """CONSORT-style flow: FlowNode positions are fractions of the axes box, so the panel
-    fills whatever cell it lands in; set aspect (height / width) to fix its shape."""
-    common = _common(kw)
-    m = _merge(lambda t: {"left!": 0.02, "right!": 0.02, "bottom!": 0.02}, margins)
+# --------------------------------------------------------------------------------------
+# Diagrams: CONSORT flow and trial schema (height measured from the text: use
+# Composite.row([...], height="auto"))
+# --------------------------------------------------------------------------------------
+from dataclasses import replace as _replace
 
-    def draw(region):
-        ax = region.axes()
-        _, _, w, h = region.box
-        plot_flowchart(ax, nodes, edges, w, h, **kw)
-        return ax
+from .consort import Consort, ConsortStyle, Exit  # noqa: E402
+from .diagram import Canvas  # noqa: E402
+from .schema import Band, Bracket, Event, RunIn, SchemaStyle, TrialSchema  # noqa: E402
 
-    return Panel(draw, margins=m, aspect=aspect, no_axes_frame=True, **common)
+_DIAGRAM_MARGINS = {"left!": 0.10, "right!": 0.06, "bottom!": 0.08, "top!": 0.26}
+
+
+def _diagram_panel(build, margins, title, label):
+    def draw(r):
+        obj = build(r.theme).layout(r.box[2])
+        cv = Canvas(r.axes(), r.box[2], r.box[3])
+        obj.draw(cv)
+        r.data["layout"] = obj
+
+    def measure(t, w):
+        return build(t).layout(w).height + 0.02
+
+    return Panel(draw, {**_DIAGRAM_MARGINS, **(margins or {})}, None, title, label, measure=measure)
+
+
+def consort_panel(pre, arms=(), *, style: ConsortStyle | None = None, margins=None, title=None,
+                  label=None):
+    """CONSORT flow. pre: trunk stages/Exits ending at the randomization box; arms: one list
+    of alternating stages and Exits (or None) per arm. Text size follows the theme unless a
+    style is given."""
+    def build(t):
+        st = style or ConsortStyle(size=t.small_size * 0.96)
+        return Consort(pre, arms, st)
+    return _diagram_panel(build, margins, title, label)
+
+
+def trial_schema_panel(anchors, bands, *, events=(), breaks=(), run_in=None, randomization=None,
+                       bracket=None, criteria=None, axis_title="", style: SchemaStyle | None = None,
+                       margins=None, title=None, label=None):
+    """Trial-design schematic: arm bands (with chevron continuations) on a broken time axis,
+    run-in box with a fork into the arms, timeline events with arrows, optional eligibility
+    column on the left."""
+    def build(t):
+        st = style or SchemaStyle(size=t.small_size * 0.96)
+        return TrialSchema(anchors, bands, events, breaks, run_in, randomization, bracket, criteria,
+                           axis_title, st)
+    return _diagram_panel(build, margins, title, label)

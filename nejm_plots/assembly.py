@@ -194,6 +194,8 @@ class Panel:
     title: str | None = None
     label: str | bool | None = None               # None = auto letter, False = none
     no_axes_frame: bool = False
+    measure: Callable | None = None               # fn(theme, width_in) -> natural height (in),
+    # used when a row is added with height="auto" (diagrams, flow charts, text panels)
 
     def save(self, path, *, width=3.4, height=1.6, theme: Theme | None = None,
              formats=("png", "svg"), dpi=300, label=False):
@@ -228,7 +230,8 @@ class Composite:
     def row(self, cells: Sequence, height=1.6, gap_after=None):
         """cells: Panel or (Panel, span) items; spans default to an even split of the
         12 columns. A None entry (or (None, span)) leaves an empty slot.
-        height: axes height in inches (identical for every panel in the row)."""
+        height: axes height in inches (identical for every panel in the row), or "auto" to
+        use the tallest natural height of the panels that can measure themselves."""
         norm = []
         bare = [c for c in cells if not isinstance(c, tuple)]
         used = sum(c[1] for c in cells if isinstance(c, tuple))
@@ -260,7 +263,7 @@ class Composite:
             top = max(m["top"] for m in ms if m) if any(ms) else t.top
             bot = max(m["bottom"] for m in ms if m) if any(ms) else t.bottom
             col = 0.0
-            cells = []
+            geo = []
             for (p, span), m in zip(r.cells, ms):
                 cx = self.outer + col * unit
                 cw = span * unit
@@ -270,13 +273,20 @@ class Composite:
                 last = col >= self.columns - 1e-9
                 ax_x = cx + m["left"]
                 ax_w = cw - m["left"] - m["right"] - (0 if last else t.gutter)
+                geo.append((p, cx, cw, ax_x, ax_w))
+            height = r.height
+            if height in (None, "auto"):
+                hs = [p.measure(t, ax_w) for p, _, _, _, ax_w in geo if p.measure]
+                height = max(hs) if hs else 1.6
+            cells = []
+            for p, cx, cw, ax_x, ax_w in geo:
                 if p.aspect:
-                    tw = r.height / p.aspect
+                    tw = height / p.aspect
                     if tw < ax_w:
                         ax_x += (ax_w - tw) / 2
                         ax_w = tw
-                cells.append((p, (cx, y, cw, top + r.height + bot), (ax_x, y + top, ax_w, r.height)))
-            total = top + r.height + bot
+                cells.append((p, (cx, y, cw, top + height + bot), (ax_x, y + top, ax_w, height)))
+            total = top + height + bot
             plan.append((cells, y, total))
             y += total + (t.row_gap if r.gap_after is None else r.gap_after)
         height = y - (t.row_gap if self.rows and self.rows[-1].gap_after is None else 0) + self.outer

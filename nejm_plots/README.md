@@ -116,3 +116,20 @@ Writing a new maker: return `Panel(draw, margins, aspect, title, label)` where `
 Every maker also accepts `title=` (shown after the letter), `label=` (`False` to suppress, or a fixed letter) and `margins=`. Values computed while drawing (P values, AUCs, fits, divergence onset) are kept on the region: `fig.regions[i].data`.
 
 `compose_demo.py` builds 18 panels once, saves each alone to `out/panels/`, and assembles them into `composite_1`, `composite_2` and `composite_2_nejm`.
+
+## Diagrams: trial schema and CONSORT flow (`trial_design_figure.py` -> fig9)
+
+| Module | What it gives you |
+|---|---|
+| `diagram.py` | `Canvas` (axes in inches, origin top-left), `TextBlock` of `Para` / `Item` parts with measured word wrap, hanging indents and shared label columns (counts right-aligned, "1." left-aligned), `Canvas.box` (height from text), `Canvas.arrow` (polyline with head), `Canvas.chevron`, `box_height` |
+| `consort.py` | `Consort(pre=[...], arms=[[...], [...]])` with `Exit(header, [(n, reason), ...])` boxes; arms aligned row by row, exits on the outer side, split bar under randomization; 1 to 3 arms; `ConsortStyle` for widths (fractions of panel width), gaps, sizes |
+| `schema.py` | `TrialSchema` with `Band` (arm, optional lighter chevron continuation via `post=`), `Event` (text + arrow at a time, `lift` to stagger), `RunIn` box with automatic fork into the arms, `Bracket` (lead-in), eligibility column with elbow arrow, broken time axis from `anchors=[(t, frac, label)]` and `breaks=[(t_a, t_b, pos)]` |
+| `panels.py` | `consort_panel(...)`, `trial_schema_panel(...)`; both measure their own height, so use `Composite.row([...], height="auto")` or `panel.save(..., height="auto")` |
+
+```python
+c = Composite(width=7.1, theme=Theme.nejm())
+c.row([trial_schema_panel(anchors, bands, events=events, run_in=run_in, randomization=0,
+                          criteria=criteria, title="Trial Design")], height="auto")
+c.row([consort_panel(pre, arms, title="Screening, Randomization, and Analysis")], height="auto")
+c.save("out/figure1")
+```
