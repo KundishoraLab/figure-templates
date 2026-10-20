@@ -510,14 +510,14 @@ def _diagram_panel(build, margins, title, label):
     return Panel(draw, {**_DIAGRAM_MARGINS, **(margins or {})}, None, title, label, measure=measure)
 
 
-def consort_panel(pre, arms=(), *, style: ConsortStyle | None = None, margins=None, title=None,
-                  label=None):
-    """CONSORT flow. pre: trunk stages/Exits ending at the randomization box; arms: one list
-    of alternating stages and Exits (or None) per arm. Text size follows the theme unless a
-    style is given."""
+def consort_panel(pre, arms=(), *, sources=(), style: ConsortStyle | None = None, margins=None,
+                  title=None, label=None):
+    """CONSORT flow. sources: optional top row of contributing cohorts merging into the trunk;
+    pre: trunk stages/Exits ending at the randomization box; arms: one list of alternating
+    stages and Exits (or None) per arm. Text size follows the theme unless a style is given."""
     def build(t):
         st = style or ConsortStyle(size=t.small_size * 0.96)
-        return Consort(pre, arms, st)
+        return Consort(pre, arms, st, sources=sources)
     return _diagram_panel(build, margins, title, label)
 
 

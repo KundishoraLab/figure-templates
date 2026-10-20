@@ -67,11 +67,18 @@ class ConsortStyle:
     arm_exit_dx: float = 0.048       # arm trunk -> near edge of its exits
     trunk: float = 0.508
     arm_centers: Sequence[float] | None = None
+    source_gap: float = 0.03         # fraction of the panel width between source boxes
+    source_drop: float = 0.15        # source boxes -> merge bar
+    source_rise: float = 0.27        # merge bar -> first trunk box
 
 
 class Consort:
-    def __init__(self, pre: Sequence, arms: Sequence[Sequence] = (), style: ConsortStyle | None = None):
+    def __init__(self, pre: Sequence, arms: Sequence[Sequence] = (), style: ConsortStyle | None = None,
+                 sources: Sequence = ()):
+        """sources: boxes in a top row (one per contributing cohort) that merge into the first
+        trunk stage; each is a string or a TextBlock parts list."""
         self.pre, self.arms = list(pre), [list(a) for a in arms]
+        self.sources = list(sources)
         self.st = style or ConsortStyle()
 
     # ---- layout --------------------------------------------------------------------------
@@ -86,6 +93,21 @@ class Consort:
         trunk = st.trunk * W
         y = 0.0
         prev = None
+        merge_y = None
+        if self.sources:
+            k = len(self.sources)
+            gap = st.source_gap * W
+            w = (W - gap * (k - 1)) / k
+            blocks = [self._block(sx, w, True) for sx in self.sources]
+            h = max(max(b.height + 2 * st.pad_y for b in blocks), st.min_h)
+            nodes = [Node(i * (w + gap), 0.0, w, h) for i in range(k)]
+            for n, b in zip(nodes, blocks):
+                ops.append(("box", (n, b)))
+            merge_y = h + st.source_drop
+            for n in nodes:
+                ops.append(("line", [(n.cx, n.bottom), (n.cx, merge_y)]))
+            ops.append(("line", [(nodes[0].cx, merge_y), (nodes[-1].cx, merge_y)]))
+            y = merge_y + st.source_rise
         for it in self.pre:
             if it is None:
                 continue
@@ -103,6 +125,8 @@ class Consort:
                 ops.append(("box", (n, b)))
                 if prev is not None:
                     ops.append(("arrow", [(trunk, prev.bottom), (trunk, n.top)]))
+                elif merge_y is not None:
+                    ops.append(("arrow", [(trunk, merge_y), (trunk, n.top)]))
                 prev = n
                 y = n.bottom + st.gap
         if not self.arms:
