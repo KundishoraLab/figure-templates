@@ -260,9 +260,10 @@ def forest_panel(rows: Sequence[ForestRow], *, xlim=(0.25, 4), xticks=(0.25, 0.5
                  xticklabels=None, log=True, ref=1.0, label_w=1.25, n_w=0.45, est_w=0.95,
                  headers=("Subgroup", "No.", "Hazard Ratio (95% CI)"), better=None,
                  shade=True, est_fmt="{:.2f} ({:.2f}–{:.2f})", margins=None, title=None,
-                 label=None):
+                 label=None, xbreak=None):
     """Subgroup / multi-outcome forest plot. Suggested axes height: ~0.16 in per row.
-    label_w, n_w, est_w: widths (in) of the label, N and estimate text columns."""
+    label_w, n_w, est_w: widths (in) of the label, N and estimate text columns.
+    xbreak: (hi_left, lo_right) draws the axis in two segments with a break (plot_forest)."""
 
     def draw(r):
         t = r.theme
@@ -276,7 +277,7 @@ def forest_panel(rows: Sequence[ForestRow], *, xlim=(0.25, 4), xticks=(0.25, 0.5
         ya = t.font_size * 1.4 + 8
         plot_forest(ax, rows, xlim=xlim, xticks=xticks,
                     xticklabels=xticklabels or [f"{v:g}" for v in xticks], ref=ref, log=log,
-                    cols=cols, headers=headers, better=better, shade=shade, est_fmt=est_fmt,
+                    cols=cols, headers=headers, better=better, shade=shade, est_fmt=est_fmt, xbreak=xbreak,
                     shade_extent=(r.axes_fraction_x(0.0), 1 + est_w / bw),
                     fontsize=t.small_size, ms=t.font_size * 0.6, capsize=2, lw=t.axes_lw,
                     arrow_offset=ya, better_offset=ya + t.small_size * 1.5,

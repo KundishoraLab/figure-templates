@@ -28,13 +28,40 @@ def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25,
                 est_fmt="{:.2f} ({:.2f}–{:.2f})", shade=True, shade_color=COLORS["shade"],
                 shade_extent=None, marker="s", ms=5.5, capsize=2.5, lw=1.0, color="black",
                 better=None, arrow_offset=26, better_offset=46, indent_width=0.035,
-                fontsize=None, header_weight="semibold", row_height=1.0, header_gap=1.0):
+                fontsize=None, header_weight="semibold", row_height=1.0, header_gap=1.0,
+                xbreak=None, break_gap=0.035):
     """Draw a forest plot on `ax`, with text columns placed in axes-fraction x coordinates.
 
     cols: dict with keys label, n, est (x positions, axes fraction) and n_ha / est_ha.
           Text columns live outside the axes, so leave room in your layout.
     better: ("Drug Better", "Placebo Better") labels under the arrows (None to skip).
+    xbreak: (hi_left, lo_right) splits the axis into two segments, xlim[0]..hi_left and
+            lo_right..xlim[1], with a gap of `break_gap` (axes fraction) and break marks; each
+            segment keeps the scale, gets the ticks that fall inside it, and its share of the
+            width follows its span. Intervals are clipped to the segments (a wide interval
+            runs into the gap and continues on the other side).
     """
+    segs = [(xlim[0], xbreak[0]), (xbreak[1], xlim[1])] if xbreak else [tuple(xlim)]
+
+    def span(a, b):
+        return np.log10(b / a) if log else b - a
+
+    total = sum(span(*sg) for sg in segs)
+    gap = break_gap if xbreak else 0.0
+    starts, widths = [], []
+    x0 = 0.0
+    for sg in segs:
+        w = span(*sg) / total * (1 - gap * (len(segs) - 1))
+        starts.append(x0); widths.append(w); x0 += w + gap
+
+    def xfrac(v):
+        """A data value's position in parent-axes fraction, through the segments."""
+        for sg, s0, w in zip(segs, starts, widths):
+            if sg[0] <= v <= sg[1] or sg is segs[-1] and v > sg[1] or sg is segs[0] and v < sg[0]:
+                return s0 + span(sg[0], v) / span(*sg) * w
+        # in the gap: the right edge of the left segment
+        return starts[0] + widths[0]
+
     cols = {"label": -1.08, "n": -0.55, "n_ha": "right", "est": 1.85, "est_ha": "right",
             "h_label": -1.08, "h_n": -0.72, "h_est": 1.85, "h_est_ha": "right", **(cols or {})}
     shade_extent = shade_extent or (cols["label"] - 0.02, cols["est"] + 0.02)
@@ -44,6 +71,18 @@ def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25,
     ax.set_ylim(ys[-1] - 0.6 * row_height, 0.6 * row_height)
     ax.patch.set_visible(False)
     tr_rows = blended_transform_factory(ax.transAxes, ax.transData)
+    if xbreak:                                  # the data live on one inset axes per segment
+        data_axes = []
+        for sg, s0, w in zip(segs, starts, widths):
+            a_ = ax.inset_axes([s0, 0, w, 1])
+            a_.patch.set_visible(False)
+            a_.set_ylim(*ax.get_ylim())
+            for side in ("left", "right", "top"):
+                a_.spines[side].set_visible(False)
+            a_.tick_params(axis="y", left=False, labelleft=False)
+            data_axes.append((a_, sg))
+    else:
+        data_axes = [(ax, tuple(xlim))]
 
     for i, (r, y) in enumerate(zip(rows, ys)):
         if shade and i % 2 == 0:
@@ -57,9 +96,10 @@ def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25,
             ax.text(cols["n"], y, f"{r.n}", transform=tr_rows, ha=cols["n_ha"], va="center",
                     fontsize=fontsize, clip_on=False)
         if r.est is not None:
-            ax.errorbar([r.est], [y], xerr=[[r.est - r.lo], [r.hi - r.est]], fmt=marker,
-                        ms=ms, color=color, ecolor=color, elinewidth=lw, capsize=capsize,
-                        capthick=lw, zorder=3, clip_on=False)
+            for a_, _ in data_axes:
+                a_.errorbar([r.est], [y], xerr=[[r.est - r.lo], [r.hi - r.est]], fmt=marker,
+                            ms=ms, color=color, ecolor=color, elinewidth=lw, capsize=capsize,
+                            capthick=lw, zorder=3, clip_on=bool(xbreak))
             ax.text(cols["est"], y, est_fmt.format(r.est, r.lo, r.hi), transform=tr_rows,
                     ha=cols["est_ha"], va="center", fontsize=fontsize, clip_on=False)
 
@@ -70,38 +110,48 @@ def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25,
                     fontweight=header_weight, clip_on=False,
                     ha=cols.get(key + "_ha", "left"))
 
-    if log:
-        ax.set_xscale("log")
-    ax.set_xlim(*xlim)
-    ax.xaxis.set_major_locator(FixedLocator(list(xticks)))
-    ax.xaxis.set_major_formatter(FixedFormatter(
-        list(xticklabels) if xticklabels else [f"{t:.2f}" for t in xticks]))
-    ax.xaxis.set_minor_locator(NullLocator())
-    ax.axvline(ref, color="black", lw=1.0, zorder=2)
+    labels = list(xticklabels) if xticklabels else [f"{t:.2f}" for t in xticks]
+    for a_, sg in data_axes:
+        if log:
+            a_.set_xscale("log")
+        a_.set_xlim(*sg)
+        keep = [(t, l) for t, l in zip(xticks, labels) if sg[0] <= t <= sg[1]]
+        a_.xaxis.set_major_locator(FixedLocator([t for t, _ in keep]))
+        a_.xaxis.set_major_formatter(FixedFormatter([l for _, l in keep]))
+        a_.xaxis.set_minor_locator(NullLocator())
+        if sg[0] <= ref <= sg[1]:
+            a_.axvline(ref, color="black", lw=1.0, zorder=2)
+        a_.spines["bottom"].set_bounds(*sg)
     ax.spines["left"].set_visible(False)
     ax.tick_params(axis="y", left=False, labelleft=False)
-    ax.spines["bottom"].set_bounds(*xlim)
+    if xbreak:
+        ax.xaxis.set_visible(False)
+        ax.spines["bottom"].set_visible(False)
+        ax.set_xlim(0, 1)
+        dx, dy = 0.006, 0.025                   # the break marks: a pair of slanted strokes at each cut
+        for xc in (starts[0] + widths[0], starts[1]):
+            ax.plot([xc - dx, xc + dx], [-dy, dy], transform=ax.transAxes, color="black",
+                    lw=1.0, clip_on=False, zorder=4)
+    else:
+        ax.spines["bottom"].set_bounds(*xlim)
 
     if better:
         fig = ax.figure
-        tr = blended_transform_factory(ax.transData, ax.transAxes)
+        tr = ax.transAxes
 
         def down(pts):
             return tr + ScaledTranslation(0, -pts / 72, fig.dpi_scale_trans)
 
-        if log:
-            l_start, r_start = ref * 0.93, ref / 0.93
-        else:                                   # a linear axis: the arrows start a little either side of ref
-            d = 0.035 * (xlim[1] - xlim[0])
-            l_start, r_start = ref - d, ref + d
-        l_end, r_end = xlim[0] * 1.05 if log else xlim[0] + 0.04 * (xlim[1] - xlim[0]), xlim[1] * 0.96 if log else xlim[1] - 0.04 * (xlim[1] - xlim[0])
+        # the arrows run in parent-axes fraction (through the segments when the axis is split):
+        # from a little either side of the reference to a little inside each end
+        xr, d = xfrac(ref), 0.035
+        l_start, r_start, l_end, r_end = xr - d, xr + d, 0.04, 0.96
         for s, e in ((l_start, l_end), (r_start, r_end)):
             ax.annotate("", xy=(e, 0), xycoords=down(arrow_offset), xytext=(s, 0),
                         textcoords=down(arrow_offset),
                         arrowprops=dict(arrowstyle="-|>", lw=1.0, color="black",
                                         mutation_scale=10, shrinkA=0, shrinkB=0))
         for lab, (s, e) in zip(better, ((l_start, l_end), (r_start, r_end))):
-            mid = np.sqrt(s * e) if log else (s + e) / 2
-            ax.text(mid, 0, lab, transform=down(better_offset), ha="center", va="center",
+            ax.text((s + e) / 2, 0, lab, transform=down(better_offset), ha="center", va="center",
                     fontweight="bold", fontsize=fontsize, clip_on=False)
     return ys
