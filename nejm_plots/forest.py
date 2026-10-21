@@ -89,9 +89,12 @@ def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25,
         def down(pts):
             return tr + ScaledTranslation(0, -pts / 72, fig.dpi_scale_trans)
 
-        f = 0.93 if log else 0.0
-        l_start, l_end = ref * f, xlim[0] * 1.05
-        r_start, r_end = ref / f, xlim[1] * 0.96
+        if log:
+            l_start, r_start = ref * 0.93, ref / 0.93
+        else:                                   # a linear axis: the arrows start a little either side of ref
+            d = 0.035 * (xlim[1] - xlim[0])
+            l_start, r_start = ref - d, ref + d
+        l_end, r_end = xlim[0] * 1.05 if log else xlim[0] + 0.04 * (xlim[1] - xlim[0]), xlim[1] * 0.96 if log else xlim[1] - 0.04 * (xlim[1] - xlim[0])
         for s, e in ((l_start, l_end), (r_start, r_end)):
             ax.annotate("", xy=(e, 0), xycoords=down(arrow_offset), xytext=(s, 0),
                         textcoords=down(arrow_offset),
