@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 import numpy as np
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Polygon, Rectangle
 from matplotlib.ticker import FixedLocator, FixedFormatter, NullLocator
 from matplotlib.transforms import blended_transform_factory, ScaledTranslation
 
@@ -20,6 +20,7 @@ class ForestRow:
     lo: float | None = None
     hi: float | None = None
     indent: int = 0           # 0 = header/overall, 1 = subgroup level
+    pooled: bool = False      # True draws a diamond spanning the interval (a pooled / overall estimate)
 
 
 def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25, 0.5, 1.0, 2.0),
@@ -29,7 +30,7 @@ def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25,
                 shade_extent=None, marker="s", ms=5.5, capsize=2.5, lw=1.0, color="black",
                 better=None, arrow_offset=26, better_offset=46, indent_width=0.035,
                 fontsize=None, header_weight="semibold", row_height=1.0, header_gap=1.0,
-                xbreak=None, break_gap=0.035):
+                xbreak=None, break_gap=0.035, xlabel=None, xlabel_offset=None):
     """Draw a forest plot on `ax`, with text columns placed in axes-fraction x coordinates.
 
     cols: dict with keys label, n, est (x positions, axes fraction) and n_ha / est_ha.
@@ -40,6 +41,7 @@ def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25,
             segment keeps the scale, gets the ticks that fall inside it, and its share of the
             width follows its span. Intervals are clipped to the segments (a wide interval
             runs into the gap and continues on the other side).
+    xlabel: a title under the axis (centred on it; with `better` it sits under the arrow labels).
     """
     segs = [(xlim[0], xbreak[0]), (xbreak[1], xlim[1])] if xbreak else [tuple(xlim)]
 
@@ -97,9 +99,14 @@ def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25,
                     fontsize=fontsize, clip_on=False)
         if r.est is not None:
             for a_, _ in data_axes:
-                a_.errorbar([r.est], [y], xerr=[[r.est - r.lo], [r.hi - r.est]], fmt=marker,
-                            ms=ms, color=color, ecolor=color, elinewidth=lw, capsize=capsize,
-                            capthick=lw, zorder=3, clip_on=bool(xbreak))
+                if r.pooled:                    # the diamond: its width is the interval
+                    hh = 0.32 * row_height
+                    a_.add_patch(Polygon([(r.lo, y), (r.est, y + hh), (r.hi, y), (r.est, y - hh)], closed=True,
+                                         facecolor=color, edgecolor=color, lw=lw, zorder=3, clip_on=bool(xbreak)))
+                else:
+                    a_.errorbar([r.est], [y], xerr=[[r.est - r.lo], [r.hi - r.est]], fmt=marker,
+                                ms=ms, color=color, ecolor=color, elinewidth=lw, capsize=capsize,
+                                capthick=lw, zorder=3, clip_on=bool(xbreak))
             ax.text(cols["est"], y, est_fmt.format(r.est, r.lo, r.hi), transform=tr_rows,
                     ha=cols["est_ha"], va="center", fontsize=fontsize, clip_on=False)
 
@@ -135,12 +142,15 @@ def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25,
     else:
         ax.spines["bottom"].set_bounds(*xlim)
 
-    if better:
-        fig = ax.figure
-        tr = ax.transAxes
+    fig = ax.figure
 
-        def down(pts):
-            return tr + ScaledTranslation(0, -pts / 72, fig.dpi_scale_trans)
+    def down(pts):
+        return ax.transAxes + ScaledTranslation(0, -pts / 72, fig.dpi_scale_trans)
+
+    if xlabel:
+        off = xlabel_offset if xlabel_offset is not None else (better_offset + 16 if better else arrow_offset)
+        ax.text(0.5, 0, xlabel, transform=down(off), ha="center", va="center", fontsize=fontsize, clip_on=False)
+    if better:
 
         # the arrows run in parent-axes fraction (through the segments when the axis is split):
         # from a little either side of the reference to a little inside each end
