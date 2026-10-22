@@ -260,11 +260,13 @@ def forest_panel(rows: Sequence[ForestRow], *, xlim=(0.25, 4), xticks=(0.25, 0.5
                  xticklabels=None, log=True, ref=1.0, label_w=1.25, n_w=0.45, est_w=0.95,
                  headers=("Subgroup", "No.", "Hazard Ratio (95% CI)"), better=None,
                  shade=True, est_fmt="{:.2f} ({:.2f}–{:.2f})", margins=None, title=None,
-                 label=None, xbreak=None, xlabel=None, p_w=0.0, p_fmt=None):
+                 label=None, xbreak=None, xlabel=None, p_w=0.0, p_fmt=None, q_w=0.0):
     """Subgroup / multi-outcome forest plot. Suggested axes height: ~0.16 in per row.
     label_w, n_w, est_w: widths (in) of the label, N and estimate text columns.
     p_w: width (in) of a P column right of the estimates (0 = none); it prints each ForestRow.p through
     p_fmt (default forest.format_p_cell, "<0.001" / "0.04"), and headers then takes a fourth entry.
+    q_w: width (in) of a q-value column right of the P column (0 = none); it prints each ForestRow.q
+    through the same p_fmt, and headers then takes a fifth entry.
     xbreak: (hi_left, lo_right) draws the axis in two segments with a break (plot_forest).
     xlabel: a title under the axis; a row with pooled=True is drawn as a diamond."""
 
@@ -279,16 +281,19 @@ def forest_panel(rows: Sequence[ForestRow], *, xlim=(0.25, 4), xticks=(0.25, 0.5
                     h_est=1 + (est_w - 0.04) / bw, h_est_ha="right")
         if p_w:
             cols.update(p=1 + (est_w + p_w - 0.04) / bw, p_ha="right", h_p=1 + (est_w + p_w - 0.04) / bw, h_p_ha="right")
+        if q_w:
+            qx = 1 + (est_w + p_w + q_w - 0.04) / bw
+            cols.update(q=qx, q_ha="right", h_q=qx, h_q_ha="right")
         ya = t.font_size * 1.4 + 8
         plot_forest(ax, rows, xlim=xlim, xticks=xticks,
                     xticklabels=xticklabels or [f"{v:g}" for v in xticks], ref=ref, log=log,
                     cols=cols, headers=headers, better=better, shade=shade, est_fmt=est_fmt, xbreak=xbreak, xlabel=xlabel,
-                    shade_extent=(r.axes_fraction_x(0.0), 1 + (est_w + p_w) / bw),
+                    shade_extent=(r.axes_fraction_x(0.0), 1 + (est_w + p_w + q_w) / bw),
                     **({"p_fmt": p_fmt} if p_fmt else {}),
                     fontsize=t.small_size, ms=t.font_size * 0.6, capsize=2, lw=t.axes_lw,
                     arrow_offset=ya, better_offset=ya + t.small_size * 1.5,
                     indent_width=0.1 / bw)
-    return Panel(draw, _merge(lambda t: {"left": label_w + n_w, "right": est_w + p_w,
+    return Panel(draw, _merge(lambda t: {"left": label_w + n_w, "right": est_w + p_w + q_w,
                                          "bottom": t.bottom + (0.28 if better else 0) + (0.16 if xlabel else 0),
                                          "top": t.top + 0.12}, margins), None, title, label)
 
