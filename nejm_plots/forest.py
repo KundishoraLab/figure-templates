@@ -21,6 +21,16 @@ class ForestRow:
     hi: float | None = None
     indent: int = 0           # 0 = header/overall, 1 = subgroup level
     pooled: bool = False      # True draws a diamond spanning the interval (a pooled / overall estimate)
+    p: float | str | None = None  # a P value for the optional P column (a float is formatted with p_fmt)
+
+
+def format_p_cell(p):
+    """A P value as an NEJM table cell: "<0.001", three places below 0.01, otherwise two (half-up)."""
+    import decimal
+    if p < 0.001:
+        return "<0.001"
+    q = decimal.Decimal("0.001" if p < 0.01 else "0.01")
+    return str(decimal.Decimal(repr(float(p))).quantize(q, rounding=decimal.ROUND_HALF_UP))
 
 
 def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25, 0.5, 1.0, 2.0),
@@ -30,10 +40,11 @@ def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25,
                 shade_extent=None, marker="s", ms=5.5, capsize=2.5, lw=1.0, color="black",
                 better=None, arrow_offset=26, better_offset=46, indent_width=0.035,
                 fontsize=None, header_weight="semibold", row_height=1.0, header_gap=1.0,
-                xbreak=None, break_gap=0.035, xlabel=None, xlabel_offset=None):
+                xbreak=None, break_gap=0.035, xlabel=None, xlabel_offset=None, p_fmt=format_p_cell):
     """Draw a forest plot on `ax`, with text columns placed in axes-fraction x coordinates.
 
-    cols: dict with keys label, n, est (x positions, axes fraction) and n_ha / est_ha.
+    cols: dict with keys label, n, est (x positions, axes fraction) and n_ha / est_ha; an optional
+          "p" key (with p_ha / h_p) draws each row's ForestRow.p in a P column, and a fourth header names it.
           Text columns live outside the axes, so leave room in your layout.
     better: ("Drug Better", "Placebo Better") labels under the arrows (None to skip).
     xbreak: (hi_left, lo_right) splits the axis into two segments, xlim[0]..hi_left and
@@ -109,10 +120,13 @@ def plot_forest(ax, rows: Sequence[ForestRow], *, xlim=(0.2, 3.0), xticks=(0.25,
                                 capthick=lw, zorder=3, clip_on=bool(xbreak))
             ax.text(cols["est"], y, est_fmt.format(r.est, r.lo, r.hi), transform=tr_rows,
                     ha=cols["est_ha"], va="center", fontsize=fontsize, clip_on=False)
+        if "p" in cols and r.p is not None:
+            ax.text(cols["p"], y, r.p if isinstance(r.p, str) else p_fmt(r.p), transform=tr_rows,
+                    ha=cols.get("p_ha", "right"), va="center", fontsize=fontsize, clip_on=False)
 
     hy = ys[0] + header_gap * row_height
     if headers:
-        for key, h in zip(("h_label", "h_n", "h_est"), headers):
+        for key, h in zip(("h_label", "h_n", "h_est", "h_p"), headers):
             ax.text(cols[key], hy, h, transform=tr_rows, va="center", fontsize=fontsize,
                     fontweight=header_weight, clip_on=False,
                     ha=cols.get(key + "_ha", "left"))

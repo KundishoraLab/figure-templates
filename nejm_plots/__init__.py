@@ -6,7 +6,7 @@ a new figure layout:
     style      use_nejm_style, InchLayout, add_y_break, COLORS, MRS_COLORS
     km         kaplan_meier, logrank_test, KMArm, plot_km, add_at_risk_table,
                add_km_pvalue, add_km_annotation, label_curves
-    forest     ForestRow, plot_forest
+    forest     ForestRow, format_p_cell, plot_forest
     grotta     plot_grotta, mrs_legend
     estimates  plot_point_range, dot_legend, plot_trajectory, add_difference_bracket,
                band_legend
@@ -29,7 +29,7 @@ from .style import (COLORS, MRS_COLORS, InchLayout, add_y_break, auto_y_break, c
                     log10_axis, sci_times_labels, use_nejm_style)
 from .km import (KMArm, KMFit, add_at_risk_table, add_km_annotation, add_km_pvalue,
                  format_p, kaplan_meier, label_curves, logrank_test, median_survival, plot_km)
-from .forest import ForestRow, plot_forest
+from .forest import ForestRow, format_p_cell, plot_forest
 from .grotta import mrs_legend, plot_grotta
 from .estimates import (add_difference_bracket, band_legend, dot_legend, plot_point_range,
                         plot_trajectory)
