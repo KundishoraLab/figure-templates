@@ -7,8 +7,8 @@ figures.
 """
 from .bars import ordered_bar, stacked_bar, stacked_hbar
 from .dotplot import (
-    dotplot_expression, dotplot_gsea, dotplot_pathway, expression_matrix,
-    prettify_pathway,
+    dotplot_expression, dotplot_gsea, dotplot_matrix, dotplot_pathway,
+    expression_matrix, prettify_pathway,
 )
 from .embedding import (
     add_scale_bar, embedding_axes, embedding_categorical, embedding_continuous,
@@ -23,7 +23,7 @@ from .volcano import (
 
 __all__ = [
     "volcano", "NOISE_GENE_PATTERNS", "CONTROL_PROBE_PATTERNS", "filter_labels",
-    "dotplot_pathway", "dotplot_gsea", "dotplot_expression",
+    "dotplot_pathway", "dotplot_gsea", "dotplot_expression", "dotplot_matrix",
     "expression_matrix", "prettify_pathway",
     "get_embedding", "embedding_axes", "embedding_categorical",
     "embedding_continuous", "two_layer_scatter", "highlight_mask",
